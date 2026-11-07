@@ -193,7 +193,7 @@ class BrowserViewModel(app: Application, startPath: String?, openSearch: Boolean
         val target = FileOps.rename(item.file, newName)
         clearSelection()
         android.media.MediaScannerConnection.scanFile(
-            getApplication(), arrayOf(item.path, target.absolutePath), null, null
+            getApplication<Application>(), arrayOf(item.path, target.absolutePath), null, null
         )
         null
     }

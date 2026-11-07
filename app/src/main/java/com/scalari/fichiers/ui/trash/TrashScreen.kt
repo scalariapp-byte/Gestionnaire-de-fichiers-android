@@ -69,7 +69,7 @@ class TrashViewModel(app: Application) : AndroidViewModel(app) {
 
     fun load() {
         viewModelScope.launch {
-            _entries.value = withContext(Dispatchers.IO) { TrashManager.list(getApplication()) }
+            _entries.value = withContext(Dispatchers.IO) { TrashManager.list(getApplication<Application>()) }
         }
     }
 }

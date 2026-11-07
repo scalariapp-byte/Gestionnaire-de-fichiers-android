@@ -142,7 +142,7 @@ private fun SwitchItem(title: String, subtitle: String?, checked: Boolean, onCha
     ListItem(
         modifier = Modifier.clickable { onChange(!checked) },
         headlineContent = { Text(title) },
-        supportingContent = subtitle?.let { { Text(it) } },
+        supportingContent = if (subtitle != null) { { Text(subtitle) } } else null,
         trailingContent = { Switch(checked = checked, onCheckedChange = onChange) },
     )
 }

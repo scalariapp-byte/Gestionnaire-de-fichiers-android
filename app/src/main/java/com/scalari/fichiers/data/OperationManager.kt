@@ -79,7 +79,7 @@ object OperationManager {
             val now = SystemClock.uptimeMillis()
             if (force || now - last > 100) {
                 last = now
-                _progress.value = OperationProgress(title, name, bytes, totalBytes, items, totalItems)
+                OperationManager._progress.value = OperationProgress(title, name, bytes, totalBytes, items, totalItems)
             }
         }
     }

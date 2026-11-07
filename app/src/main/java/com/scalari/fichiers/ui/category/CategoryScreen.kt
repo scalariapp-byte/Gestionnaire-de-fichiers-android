@@ -100,7 +100,7 @@ class CategoryViewModel(app: Application, private val category: Category) : Andr
         if (userRefresh) _state.update { it.copy(refreshing = true) }
         viewModelScope.launch {
             val showHidden = FileManagerApp.instance.settingsState.value.showHidden
-            val items = MediaQueries.query(getApplication(), category, showHidden)
+            val items = MediaQueries.query(getApplication<Application>(), category, showHidden)
             _state.update { st ->
                 val paths = items.mapTo(HashSet()) { it.path }
                 st.copy(items = items, loading = false, refreshing = false, selected = st.selected.filterTo(HashSet()) { it in paths })
