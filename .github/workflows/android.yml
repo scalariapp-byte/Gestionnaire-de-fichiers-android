@@ -2,8 +2,13 @@ name: Android CI
 
 on:
   push:
+    branches: ["**"]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -23,3 +28,28 @@ jobs:
         with:
           name: fichiers-apk
           path: app/build/outputs/apk/**/*.apk
+
+      - name: Préparer les APK de la release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/Fichiers-${GITHUB_REF_NAME}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/Fichiers-${GITHUB_REF_NAME}-debug.apk"
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt)
+      - name: Publier la release GitHub
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Fichiers ${{ github.ref_name }}
+          files: dist/*
+          body: |
+            Gestionnaire de fichiers Android (Android 8.0+).
+
+            **Installation** : téléchargez `Fichiers-${{ github.ref_name }}.apk`, ouvrez-le sur le téléphone
+            (autorisez les sources inconnues), puis activez « Accès à tous les fichiers » au premier lancement.
+
+            - `Fichiers-${{ github.ref_name }}.apk` : version optimisée (recommandée)
+            - `Fichiers-${{ github.ref_name }}-debug.apk` : version de débogage
+            - `SHA256SUMS.txt` : empreintes pour vérifier les fichiers
+
+            Note : APK signé avec une clé de debug (installation directe uniquement, pas de Play Store).
