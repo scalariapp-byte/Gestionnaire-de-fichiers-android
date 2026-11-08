@@ -151,7 +151,7 @@ private sealed interface BrowserDialog {
 
 @Suppress("DEPRECATION")
 @Composable
-fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigator) {
+fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigator, isTab: Boolean = false) {
     val vm: BrowserViewModel = viewModel { BrowserViewModel(FileManagerApp.instance, startPath, openSearch) }
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by FileManagerApp.instance.settingsState.collectAsStateWithLifecycle()
@@ -245,7 +245,11 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = navigator::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") }
+                        if (!isTab || !state.atRoot) {
+                            IconButton(onClick = { if (isTab) goUp() else navigator.back() }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour")
+                            }
+                        }
                     },
                     actions = {
                         IconButton(onClick = { vm.setSearchActive(true) }) { Icon(Icons.Filled.Search, "Rechercher") }

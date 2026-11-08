@@ -33,6 +33,8 @@ import com.scalari.fichiers.data.FileTypes
 import com.scalari.fichiers.data.MediaQueries
 import com.scalari.fichiers.data.StorageRoot
 import com.scalari.fichiers.data.ThemeMode
+import com.scalari.fichiers.ui.AppBottomBar
+import com.scalari.fichiers.ui.Tab
 import com.scalari.fichiers.ui.browser.Breadcrumbs
 import com.scalari.fichiers.ui.browser.PasteBar
 import com.scalari.fichiers.ui.browser.SectionHeader
@@ -88,9 +90,14 @@ class ScreenshotTest {
         item("Rapport annuel.docx", size = 640_000, ago = 400),
     )
 
-    private fun capture(name: String, dark: Boolean = false, content: @Composable () -> Unit) {
+    private fun capture(
+        name: String,
+        dark: Boolean = false,
+        mode: ThemeMode = if (dark) ThemeMode.DARK else ThemeMode.LIGHT,
+        content: @Composable () -> Unit,
+    ) {
         captureRoboImage("screenshots/$name.png") {
-            FichiersTheme(AppSettings(themeMode = if (dark) ThemeMode.DARK else ThemeMode.LIGHT, dynamicColor = false)) {
+            FichiersTheme(AppSettings(themeMode = mode, dynamicColor = false)) {
                 Surface(Modifier.fillMaxSize()) { content() }
             }
         }
@@ -192,6 +199,18 @@ class ScreenshotTest {
 
     @Test fun vault_pin() = capture("07_coffre_code", dark = true) {
         Column { PinPad("Coffre verrouillé", "Saisissez votre code", null, false, 0, onBiometric = {}) {} }
+    }
+
+    @Test fun home_amoled_tabs() = capture("09_accueil_amoled_onglets", mode = ThemeMode.BLACK) {
+        Scaffold(bottomBar = { AppBottomBar(Tab.HOME) {} }) { p -> Column(Modifier.padding(p)) { Home() } }
+    }
+
+    @Test fun browser_amoled_tabs() = capture("10_explorateur_amoled_onglets", mode = ThemeMode.BLACK) {
+        Scaffold(bottomBar = { AppBottomBar(Tab.FILES) {} }) { p -> Column(Modifier.padding(p)) { Browser() } }
+    }
+
+    @Test fun light_tabs() = capture("11_accueil_clair_onglets") {
+        Scaffold(bottomBar = { AppBottomBar(Tab.HOME) {} }) { p -> Column(Modifier.padding(p)) { Home() } }
     }
 
     @Test fun settings() = capture("08_parametres") { SettingsScreen(onBack = {}) }

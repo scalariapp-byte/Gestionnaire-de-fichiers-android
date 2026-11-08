@@ -116,30 +116,32 @@ fun SecureWindow() {
 }
 
 @Composable
-fun VaultScreen(navigator: AppNavigator) {
+fun VaultScreen(navigator: AppNavigator, isTab: Boolean = false) {
     SecureWindow()
     val context = LocalContext.current
     LaunchedEffect(Unit) { withContext(Dispatchers.IO) { VaultManager.refreshState() } }
     val state by VaultManager.state.collectAsStateWithLifecycle()
 
     when (val s = state) {
-        VaultState.NotSetUp -> SetupContent(onBack = navigator::back)
-        VaultState.Locked -> LockedContent(onBack = navigator::back)
-        is VaultState.Unlocked -> UnlockedContent(s.entries, navigator) {
+        VaultState.NotSetUp -> SetupContent(onBack = if (isTab) null else navigator::back)
+        VaultState.Locked -> LockedContent(onBack = if (isTab) null else navigator::back)
+        is VaultState.Unlocked -> UnlockedContent(s.entries, navigator, isTab) {
             VaultManager.lock(context)
-            navigator.back()
+            if (!isTab) navigator.back()
         }
     }
 }
 
 @Composable
-private fun CenteredScaffold(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+private fun CenteredScaffold(title: String, onBack: (() -> Unit)?, content: @Composable () -> Unit) {
     val snackbar = LocalSnackbarHostState.current
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(title) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") } },
+                navigationIcon = {
+                    if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") }
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -155,7 +157,7 @@ private fun CenteredScaffold(title: String, onBack: () -> Unit, content: @Compos
 }
 
 @Composable
-private fun SetupContent(onBack: () -> Unit) {
+private fun SetupContent(onBack: (() -> Unit)?) {
     var step by remember { mutableIntStateOf(0) } // 0 intro, 1 code, 2 confirmation
     var first by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
@@ -223,7 +225,7 @@ private fun SetupContent(onBack: () -> Unit) {
 }
 
 @Composable
-private fun LockedContent(onBack: () -> Unit) {
+private fun LockedContent(onBack: (() -> Unit)?) {
     val context = LocalContext.current
     val activity = context.findActivity() as? FragmentActivity
     var error by remember { mutableStateOf<String?>(null) }
@@ -274,7 +276,7 @@ private fun LockedContent(onBack: () -> Unit) {
 
 @Suppress("DEPRECATION")
 @Composable
-private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, onLockAndExit: () -> Unit) {
+private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, isTab: Boolean, onLockAndExit: () -> Unit) {
     val context = LocalContext.current
     val activity = context.findActivity() as? FragmentActivity
     val snackbar = LocalSnackbarHostState.current
@@ -291,7 +293,7 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
         val pending = VaultManager.takePending()
         if (pending.isNotEmpty()) OperationManager.vaultAdd(pending)
     }
-    BackHandler { if (selectionMode) selected = emptySet() else onLockAndExit() }
+    BackHandler(enabled = selectionMode || !isTab) { if (selectionMode) selected = emptySet() else onLockAndExit() }
 
     fun message(text: String) { scope.launch { snackbar.showSnackbar(text) } }
 
@@ -339,7 +341,9 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
                 )
             } else {
                 TopAppBar(
-                    navigationIcon = { IconButton(onClick = onLockAndExit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") } },
+                    navigationIcon = {
+                        if (!isTab) IconButton(onClick = onLockAndExit) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") }
+                    },
                     title = {
                         Column {
                             Text("Coffre-fort")

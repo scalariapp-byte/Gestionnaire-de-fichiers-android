@@ -3,6 +3,7 @@ package com.scalari.fichiers.ui.theme
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
@@ -75,22 +76,41 @@ private val AppTypography = Typography().let { t ->
     )
 }
 
+/**
+ * Variante noir pur : fonds à #000000 (pixels éteints sur écran OLED, économie de batterie),
+ * surfaces surélevées en gris très sombres pour garder la hiérarchie visuelle.
+ */
+private fun ColorScheme.toPureBlack(): ColorScheme = copy(
+    background = Color.Black,
+    surface = Color.Black,
+    surfaceDim = Color.Black,
+    surfaceBright = Color(0xFF1C1C1E),
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color(0xFF0B0B0C),
+    surfaceContainer = Color(0xFF111113),
+    surfaceContainerHigh = Color(0xFF18181B),
+    surfaceContainerHighest = Color(0xFF222226),
+    surfaceVariant = Color(0xFF1A1A1D),
+    inverseSurface = Color(0xFFE6E6EA),
+)
+
 @Composable
 fun isAppInDarkTheme(settings: AppSettings): Boolean = when (settings.themeMode) {
     ThemeMode.SYSTEM -> isSystemInDarkTheme()
     ThemeMode.LIGHT -> false
-    ThemeMode.DARK -> true
+    ThemeMode.DARK, ThemeMode.BLACK -> true
 }
 
 @Composable
 fun FichiersTheme(settings: AppSettings, content: @Composable () -> Unit) {
     val dark = isAppInDarkTheme(settings)
     val context = LocalContext.current
-    val scheme = when {
+    val base = when {
         settings.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         dark -> DarkColors
         else -> LightColors
     }
+    val scheme = if (settings.themeMode == ThemeMode.BLACK) base.toPureBlack() else base
     MaterialTheme(colorScheme = scheme, shapes = AppShapes, typography = AppTypography, content = content)
 }

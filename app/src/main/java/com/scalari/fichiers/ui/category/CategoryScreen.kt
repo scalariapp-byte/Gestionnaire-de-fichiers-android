@@ -119,7 +119,7 @@ class CategoryViewModel(app: Application, private val category: Category) : Andr
 
 @Suppress("DEPRECATION")
 @Composable
-fun CategoryScreen(category: Category, navigator: AppNavigator) {
+fun CategoryScreen(category: Category, navigator: AppNavigator, isTab: Boolean = false) {
     val vm: CategoryViewModel = viewModel { CategoryViewModel(FileManagerApp.instance, category) }
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by FileManagerApp.instance.settingsState.collectAsStateWithLifecycle()
@@ -190,7 +190,9 @@ fun CategoryScreen(category: Category, navigator: AppNavigator) {
                 )
             } else {
                 TopAppBar(
-                    navigationIcon = { IconButton(onClick = navigator::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") } },
+                    navigationIcon = {
+                        if (!isTab) IconButton(onClick = navigator::back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") }
+                    },
                     title = {
                         Column {
                             Text(category.label)

@@ -14,7 +14,7 @@ import java.io.IOException
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
-enum class ThemeMode(val label: String) { SYSTEM("Système"), LIGHT("Clair"), DARK("Sombre") }
+enum class ThemeMode(val label: String) { SYSTEM("Système"), LIGHT("Clair"), DARK("Sombre"), BLACK("Noir pur (AMOLED)") }
 
 enum class SortBy(val label: String) { NAME("Nom"), SIZE("Taille"), DATE("Date de modification"), TYPE("Type") }
 

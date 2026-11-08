@@ -6,7 +6,18 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.ui.Modifier
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -50,6 +61,8 @@ object Routes {
     const val TEXT = "text?path={path}"
     const val IMAGE = "image?path={path}&secure={secure}"
     const val VAULT = "vault"
+    const val TAB_FILES = "files"
+    const val TAB_RECENT = "recent"
     const val TRASH = "trash"
     const val SETTINGS = "settings"
 
@@ -64,11 +77,18 @@ object Routes {
 /** Actions de navigation partagées par les écrans. */
 class AppNavigator(private val nav: NavHostController) {
     fun back() { nav.popBackStack() }
+
+    /** Changement d'onglet : une seule copie par onglet, état conservé (défilement, dossier). */
+    fun tab(tab: Tab) = nav.navigate(tab.route) {
+        popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
     fun browser(path: String?, search: Boolean = false) = nav.navigate(Routes.browser(path, search))
-    fun category(c: Category) = nav.navigate(Routes.category(c))
+    fun category(c: Category) = if (c == Category.RECENT) tab(Tab.RECENT) else nav.navigate(Routes.category(c))
     fun text(path: String) = nav.navigate(Routes.text(path))
     fun image(path: String, secure: Boolean = false) = nav.navigate(Routes.image(path, secure))
-    fun vault() = nav.navigate(Routes.VAULT) { launchSingleTop = true }
+    fun vault() = tab(Tab.VAULT)
     fun trash() = nav.navigate(Routes.TRASH)
     fun settings() = nav.navigate(Routes.SETTINGS)
 }
@@ -100,6 +120,7 @@ fun FichiersApp() {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AppNavHost() {
     val nav = rememberNavController()
@@ -110,9 +131,24 @@ private fun AppNavHost() {
         defaultValue = null
     }
 
+    val entry by nav.currentBackStackEntryAsState()
+    val currentTab = tabForRoute(entry?.destination?.route)
+    Scaffold(
+        contentWindowInsets = WindowInsets(0),
+        bottomBar = {
+            AnimatedVisibility(
+                visible = currentTab != null,
+                enter = slideInVertically { it },
+                exit = slideOutVertically { it },
+            ) { AppBottomBar(currentTab, onSelect = navigator::tab) }
+        },
+    ) { barPadding ->
     NavHost(
         navController = nav,
         startDestination = Routes.HOME,
+        modifier = Modifier
+            .padding(barPadding)
+            .consumeWindowInsets(barPadding),
         enterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 12 } },
         exitTransition = { fadeOut(tween(180)) },
         popEnterTransition = { fadeIn(tween(220)) },
@@ -156,7 +192,13 @@ private fun AppNavHost() {
             )
         }
         composable(Routes.VAULT) {
-            VaultScreen(navigator)
+            VaultScreen(navigator, isTab = true)
+        }
+        composable(Routes.TAB_FILES) {
+            BrowserScreen(startPath = null, openSearch = false, navigator = navigator, isTab = true)
+        }
+        composable(Routes.TAB_RECENT) {
+            CategoryScreen(Category.RECENT, navigator, isTab = true)
         }
         composable(Routes.TRASH) {
             TrashScreen(onBack = navigator::back)
@@ -164,5 +206,6 @@ private fun AppNavHost() {
         composable(Routes.SETTINGS) {
             SettingsScreen(onBack = navigator::back)
         }
+    }
     }
 }
