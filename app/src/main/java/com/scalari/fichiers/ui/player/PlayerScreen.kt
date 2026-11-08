@@ -80,6 +80,7 @@ import com.scalari.fichiers.data.FileTypes
 import com.scalari.fichiers.data.NaturalOrder
 import com.scalari.fichiers.ui.vault.findActivity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -97,6 +98,12 @@ fun PlayerScreen(path: String, onBack: () -> Unit, secure: Boolean = false) {
     val requestedType = remember(path) { if (path.isEmpty()) null else FileTypes.of(File(path).name, false) }
     var started by rememberSaveable(path) { mutableStateOf(path.isEmpty()) }
     var resumeFrom by rememberSaveable(path) { mutableStateOf(0L) }
+    // Liste de lecture (chemins) et moteur VLC : conservés lors d'une rotation.
+    var playlistPaths by rememberSaveable(path) { mutableStateOf(listOf<String>()) }
+    var useVlc by rememberSaveable(path) { mutableStateOf(false) }
+    var vlcIndex by rememberSaveable(path) { mutableStateOf(0) }
+    var vlcStart by rememberSaveable(path) { mutableStateOf(0L) }
+    var autoSwitched by rememberSaveable(path) { mutableStateOf(false) }
 
     // Notifications (Android 13+) : nécessaires pour les commandes de lecture en arrière-plan.
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -120,6 +127,7 @@ fun PlayerScreen(path: String, onBack: () -> Unit, secure: Boolean = false) {
         val start = playlist.indexOfFirst { it.absolutePath == file.absolutePath }.coerceAtLeast(0)
         // Vidéo déjà commencée : reprise là où elle avait été interrompue.
         resumeFrom = if (!secure && requestedType == FileType.VIDEO) ResumeStore.get(context, file.absolutePath) else 0L
+        playlistPaths = playlist.map { it.absolutePath }
         c.setMediaItems(playlist.map { PlayerConnection.mediaItem(it, if (secure) "Contenu protégé" else null) }, start, resumeFrom)
         c.prepare()
         c.play()
@@ -132,7 +140,63 @@ fun PlayerScreen(path: String, onBack: () -> Unit, secure: Boolean = false) {
             CircularProgressIndicator()
         }
     } else if (isVideo) {
-        VideoPlayer(controller!!, state.title, onBack, resumeFrom = resumeFrom, allowPip = !secure)
+        val c = controller!!
+        fun switchToVlc(auto: Boolean) {
+            val current = c.currentMediaItem?.mediaId
+            vlcIndex = playlistPaths.indexOf(current).coerceAtLeast(0)
+            vlcStart = c.currentPosition.coerceAtLeast(0)
+            autoSwitched = auto
+            c.stop()
+            c.clearMediaItems()
+            useVlc = true
+        }
+        if (useVlc && playlistPaths.isNotEmpty()) {
+            val engine = remember(playlistPaths) {
+                VlcVideoEngine(context, playlistPaths.map(::File), vlcIndex, vlcStart)
+            }
+            DisposableEffect(engine) { onDispose { engine.release() } }
+            Box(Modifier.fillMaxSize()) {
+                VideoPlayer(engine, onBack, resumeFrom = 0L, allowPip = !secure)
+                var notice by remember { mutableStateOf(autoSwitched) }
+                LaunchedEffect(Unit) { delay(5_000); notice = false }
+                if (notice) {
+                    Surface(
+                        shape = MaterialTheme.shapes.large,
+                        color = Color.Black.copy(alpha = 0.7f),
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .statusBarsPadding()
+                            .padding(top = 64.dp),
+                    ) {
+                        Text(
+                            "Format non lu par Android : lecture avec VLC",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        )
+                    }
+                }
+            }
+        } else {
+            val engine = remember(c) { ExoVideoEngine(c) }
+            // Bascule automatique sur VLC si Android ne sait pas décoder la vidéo.
+            DisposableEffect(c) {
+                val listener = object : Player.Listener {
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        if (engine.cannotDecode(error) && playlistPaths.isNotEmpty()) switchToVlc(auto = true)
+                    }
+                    override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                        if (started && engine.cannotDecode(null) && playlistPaths.isNotEmpty()) switchToVlc(auto = true)
+                    }
+                }
+                c.addListener(listener)
+                onDispose { c.removeListener(listener) }
+            }
+            VideoPlayer(
+                engine, onBack, resumeFrom = resumeFrom, allowPip = !secure,
+                onSwitchEngine = if (playlistPaths.isNotEmpty()) ({ switchToVlc(auto = false) }) else null,
+            )
+        }
     } else {
         AudioPlayerContent(
             state = state,

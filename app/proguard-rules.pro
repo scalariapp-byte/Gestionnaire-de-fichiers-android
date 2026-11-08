@@ -9,3 +9,7 @@
 -dontwarn javax.crypto.**
 -dontwarn java.awt.**
 -dontwarn org.apache.commons.compress.harmony.**
+
+# libVLC : classes appelées depuis le code natif.
+-keep class org.videolan.libvlc.** { *; }
+-dontwarn org.videolan.libvlc.**

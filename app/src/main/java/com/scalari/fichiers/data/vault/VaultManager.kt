@@ -286,10 +286,14 @@ object VaultManager {
         }
     }
 
-    /** Restaure à l'emplacement d'origine (ou Téléchargements si impossible) puis retire du coffre. */
-    fun restore(entry: VaultEntry, onProgress: (Int) -> Unit): File {
+    /**
+     * Sort [entry] du coffre : déchiffre vers [targetDir] (par défaut l'emplacement d'origine,
+     * ou Téléchargements s'il n'existe plus) puis la retire du coffre.
+     */
+    fun restore(entry: VaultEntry, targetDir: File? = null, onProgress: (Int) -> Unit): File {
         val original = File(entry.originalPath)
-        val parent = original.parentFile?.takeIf { it.isDirectory || it.mkdirs() }
+        val parent = targetDir?.takeIf { it.isDirectory || it.mkdirs() }
+            ?: original.parentFile?.takeIf { it.isDirectory || it.mkdirs() }
             ?: File(StorageRoots.primary(), "Download")
         val target = FileOps.uniqueFile(parent, entry.fileName)
         decryptTo(entry, target, onProgress)

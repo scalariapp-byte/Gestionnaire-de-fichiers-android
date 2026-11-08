@@ -134,6 +134,8 @@ class HomeActions(
     val onVault: () -> Unit = {},
     val onTrash: () -> Unit = {},
     val onAnalyze: () -> Unit = {},
+    val onInstallUpdate: (com.scalari.fichiers.update.Release) -> Unit = {},
+    val onDismissUpdate: () -> Unit = {},
 )
 
 @Composable
@@ -141,6 +143,7 @@ fun HomeScreen(navigator: AppNavigator) {
     val vm: HomeViewModel = viewModel()
     val roots by vm.roots.collectAsStateWithLifecycle()
     val counts by vm.counts.collectAsStateWithLifecycle()
+    val update by com.scalari.fichiers.update.UpdateManager.state.collectAsStateWithLifecycle()
     val stats by vm.stats.collectAsStateWithLifecycle()
     val settings by FileManagerApp.instance.settingsState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -162,6 +165,8 @@ fun HomeScreen(navigator: AppNavigator) {
         onVault = navigator::vault,
         onTrash = navigator::trash,
         onAnalyze = navigator::analyzer,
+        onInstallUpdate = { r -> scope.launch { com.scalari.fichiers.update.UpdateManager.downloadAndInstall(context, r) } },
+        onDismissUpdate = { com.scalari.fichiers.update.UpdateManager.dismiss(context) },
     )
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
@@ -171,6 +176,7 @@ fun HomeScreen(navigator: AppNavigator) {
             shortcuts = remember { defaultShortcuts() },
             favorites = settings.favorites,
             counts = counts,
+            update = update,
             actions = actions,
             contentPadding = padding,
         )
@@ -185,6 +191,7 @@ fun HomeContent(
     favorites: List<String>,
     counts: Map<String, Int>,
     actions: HomeActions,
+    update: com.scalari.fichiers.update.UpdateState = com.scalari.fichiers.update.UpdateState.Idle,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
     // Conçu pour tenir sur un écran ; le défilement ne sert que sur les très petits écrans.
@@ -196,6 +203,7 @@ fun HomeContent(
             .padding(bottom = contentPadding.calculateBottomPadding() + 12.dp),
     ) {
         Header(actions)
+        UpdateBanner(update, actions)
 
         val primary = roots.firstOrNull { it.isPrimary } ?: roots.firstOrNull()
         if (primary != null) StorageCompact(primary, others = roots - primary, onOpen = actions.onOpenPath, onAnalyze = actions.onAnalyze)
@@ -458,6 +466,53 @@ private fun ShortcutTile(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
+        }
+    }
+}
+
+@Composable
+private fun UpdateBanner(state: com.scalari.fichiers.update.UpdateState, actions: HomeActions) {
+    val (release, progress, error) = when (state) {
+        is com.scalari.fichiers.update.UpdateState.Available -> Triple(state.release, null, null)
+        is com.scalari.fichiers.update.UpdateState.Downloading -> Triple(state.release, state.progress, null)
+        is com.scalari.fichiers.update.UpdateState.Error -> Triple(state.release ?: return, null, state.message)
+        else -> return
+    }
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+    ) {
+        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Download, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(
+                        "Mise à jour disponible : ${release.version}",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Text(
+                        error ?: if (progress != null) "Téléchargement… ${(progress * 100).toInt()} %" else "S'installe par-dessus la version actuelle",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                if (progress == null) {
+                    androidx.compose.material3.TextButton(onClick = actions.onDismissUpdate) { Text("Plus tard") }
+                    androidx.compose.material3.Button(onClick = { actions.onInstallUpdate(release) }) { Text("Installer") }
+                }
+            }
+            if (progress != null) {
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, end = 8.dp),
+                )
+            }
         }
     }
 }

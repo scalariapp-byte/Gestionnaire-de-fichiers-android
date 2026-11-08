@@ -25,6 +25,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import java.io.File
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Unarchive
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -285,6 +291,7 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
     val scope = rememberCoroutineScope()
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var confirmDelete by remember { mutableStateOf<List<VaultEntry>?>(null) }
+    var restoreDialog by remember { mutableStateOf<List<VaultEntry>?>(null) }
     var changePin by remember { mutableStateOf(false) }
     var opening by remember { mutableStateOf(false) }
     var bioEnabled by remember { mutableStateOf(VaultBiometric.isEnabled(context)) }
@@ -333,11 +340,6 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
                     navigationIcon = { IconButton(onClick = { selected = emptySet() }) { Icon(Icons.Filled.Close, "Annuler") } },
                     title = { Text("${selected.size} sélectionné(s)") },
                     actions = {
-                        IconButton(onClick = {
-                            OperationManager.vaultRestore(selectedEntries())
-                            selected = emptySet()
-                        }) { Icon(Icons.Filled.RestoreFromTrash, "Restaurer") }
-                        IconButton(onClick = { confirmDelete = selectedEntries() }) { Icon(Icons.Filled.Delete, "Supprimer") }
                         IconButton(onClick = { selected = entries.mapTo(HashSet()) { it.id } }) {
                             Icon(Icons.Filled.SelectAll, "Tout sélectionner")
                         }
@@ -393,6 +395,32 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
                         }
                     },
                 )
+            }
+        },
+        bottomBar = {
+            if (selectionMode) {
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shadowElevation = 6.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { restoreDialog = selectedEntries() },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(Icons.Filled.Unarchive, null, Modifier.size(18.dp))
+                            Text("  Sortir du coffre")
+                        }
+                        OutlinedButton(onClick = { confirmDelete = selectedEntries() }) {
+                            Icon(Icons.Filled.Delete, "Supprimer", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -470,6 +498,31 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
                             },
                             headlineContent = { Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             supportingContent = { Text("${formatSize(entry.size)} · ajouté le ${formatDate(entry.addedAt)}") },
+                            trailingContent = {
+                                if (!selectionMode) {
+                                    Box {
+                                        var menu by remember { mutableStateOf(false) }
+                                        IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "Actions") }
+                                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                            DropdownMenuItem(
+                                                text = { Text("Ouvrir") },
+                                                leadingIcon = { Icon(Icons.Filled.OpenInNew, null) },
+                                                onClick = { menu = false; open(entry) },
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Sortir du coffre") },
+                                                leadingIcon = { Icon(Icons.Filled.Unarchive, null) },
+                                                onClick = { menu = false; restoreDialog = listOf(entry) },
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Supprimer", color = MaterialTheme.colorScheme.error) },
+                                                leadingIcon = { Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                                                onClick = { menu = false; confirmDelete = listOf(entry) },
+                                            )
+                                        }
+                                    }
+                                }
+                            },
                         )
                     }
                 }
@@ -485,6 +538,41 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
         }
     }
 
+    restoreDialog?.let { list ->
+        val single = list.singleOrNull()
+        val downloads = File(com.scalari.fichiers.data.StorageRoots.primary(), android.os.Environment.DIRECTORY_DOWNLOADS)
+        AlertDialog(
+            onDismissRequest = { restoreDialog = null },
+            icon = { Icon(Icons.Filled.Unarchive, null) },
+            title = { Text(if (single != null) "Sortir « ${single.fileName} » ?" else "Sortir ${list.size} fichiers ?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Le fichier est déchiffré, remis dans vos fichiers, puis retiré du coffre.")
+                    if (single != null) {
+                        Text(
+                            "Emplacement d'origine : ${File(single.originalPath).parent ?: "?"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    restoreDialog = null
+                    selected = emptySet()
+                    OperationManager.vaultRestore(list)
+                }) { Text("Emplacement d'origine") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    restoreDialog = null
+                    selected = emptySet()
+                    OperationManager.vaultRestore(list, downloads)
+                }) { Text("Téléchargements") }
+            },
+        )
+    }
     confirmDelete?.let { list ->
         ConfirmDialog(
             title = "Supprimer définitivement ?",

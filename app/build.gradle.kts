@@ -13,8 +13,8 @@ android {
         applicationId = "com.scalari.fichiers"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.9.0"
+        versionCode = 15
+        versionName = "1.10.0"
 
         // Téléphones uniquement (ARM) : n'embarque pas les bibliothèques natives pour émulateurs x86.
         ndk {
@@ -71,6 +71,8 @@ android {
     }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // Bibliothèques natives compressées dans l'APK (VLC pèse ~40 Mo non compressé par processeur).
+        jniLibs.useLegacyPackaging = true
     }
 }
 
@@ -106,6 +108,10 @@ dependencies {
     implementation("androidx.media3:media3-session:$media3")
     // Moteur FFmpeg (audio) : AC3/E-AC3, DTS, TrueHD… quand le téléphone ne sait pas les décoder.
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
+    // Moteur VLC : vidéos que le téléphone ne sait pas décoder (WMV, MPEG-2, vieux DivX…).
+    implementation("org.videolan.android:libvlc-all:3.7.7")
+    // Vérification quotidienne des mises à jour.
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("com.google.guava:guava:33.3.1-android")
 
     // Archives : 7z, TAR (gz/bz2/xz) et RAR4.

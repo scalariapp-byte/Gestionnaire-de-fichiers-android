@@ -29,6 +29,7 @@ class FileManagerApp : Application(), ImageLoaderFactory {
         settings = SettingsRepository(this)
         settingsState = settings.settings.stateIn(appScope, SharingStarted.Eagerly, AppSettings())
         VaultManager.clearTemp(this)
+        runCatching { com.scalari.fichiers.update.UpdateManager.schedule(this) }
     }
 
     override fun newImageLoader(): ImageLoader =

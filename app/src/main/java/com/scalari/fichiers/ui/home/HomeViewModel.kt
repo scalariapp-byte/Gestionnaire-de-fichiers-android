@@ -36,6 +36,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         refresh(withStats = true)
+        viewModelScope.launch { com.scalari.fichiers.update.UpdateManager.check(getApplication()) }
         viewModelScope.launch { OperationManager.changes.collect { refresh(withStats = true) } }
     }
 

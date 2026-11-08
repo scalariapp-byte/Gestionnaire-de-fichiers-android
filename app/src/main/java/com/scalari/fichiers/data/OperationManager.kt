@@ -385,19 +385,20 @@ object OperationManager {
         "${plural(list.size, "fichier")} chiffré${if (list.size > 1) "s" else ""} dans le coffre-fort"
     }
 
-    fun vaultRestore(entries: List<VaultEntry>) = run("Restauration") { touched ->
+    fun vaultRestore(entries: List<VaultEntry>, targetDir: File? = null) = run("Sortie du coffre") { touched ->
         val t = Tracker("Restauration", entries.sumOf { it.size }, entries.size)
         entries.forEachIndexed { i, e ->
             currentCoroutineContext().ensureActive()
             t.update(e.fileName, force = true)
-            val target = VaultManager.restore(e) { n ->
+            val target = VaultManager.restore(e, targetDir) { n ->
                 t.bytes += n
                 t.update(e.fileName)
             }
             touched += target.absolutePath
             t.items = i + 1
         }
-        "${plural(entries.size, "fichier")} restauré${if (entries.size > 1) "s" else ""}"
+        "${plural(entries.size, "fichier")} sorti${if (entries.size > 1) "s" else ""} du coffre" +
+            (targetDir?.let { " vers « ${it.name} »" } ?: " (emplacement d'origine)")
     }
 
     fun vaultDelete(entries: List<VaultEntry>) = run("Suppression", quiet = true) { _ ->

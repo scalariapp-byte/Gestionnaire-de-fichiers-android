@@ -13,6 +13,8 @@
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Uniquement pour vérifier et télécharger les mises à jour sur github.com. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- Analyse : savoir si l'application d'un APK est déjà installée. -->
     <uses-permission

@@ -100,6 +100,33 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
 
             }
+            Group("Mises à jour") {
+                val update by com.scalari.fichiers.update.UpdateManager.state.collectAsStateWithLifecycle()
+                var auto by remember { mutableStateOf(com.scalari.fichiers.update.UpdateManager.isAutoCheckEnabled(context)) }
+                SwitchItem("Vérifier automatiquement", "Une fois par jour, sur github.com", auto) {
+                    auto = it
+                    com.scalari.fichiers.update.UpdateManager.setAutoCheck(context, it)
+                }
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable {
+                        scope.launch { com.scalari.fichiers.update.UpdateManager.check(context, force = true, manual = true) }
+                    },
+                    headlineContent = { Text("Rechercher une mise à jour") },
+                    supportingContent = {
+                        Text(
+                            when (val s = update) {
+                                com.scalari.fichiers.update.UpdateState.Checking -> "Vérification…"
+                                com.scalari.fichiers.update.UpdateState.UpToDate -> "Vous avez la dernière version (${BuildConfig.VERSION_NAME})"
+                                is com.scalari.fichiers.update.UpdateState.Available -> "Version ${s.release.version} disponible : voir l'accueil"
+                                is com.scalari.fichiers.update.UpdateState.Downloading -> "Téléchargement… ${(s.progress * 100).toInt()} %"
+                                is com.scalari.fichiers.update.UpdateState.Error -> s.message
+                                else -> "Version installée : ${BuildConfig.VERSION_NAME}"
+                            }
+                        )
+                    },
+                )
+            }
             Group("Système") {
             if (StoragePermission.needsAllFilesAccess()) {
                 ListItem(

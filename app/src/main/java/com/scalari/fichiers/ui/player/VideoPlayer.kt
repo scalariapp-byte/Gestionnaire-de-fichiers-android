@@ -8,10 +8,8 @@ import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.os.Build
 import android.util.Rational
-import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
-import androidx.annotation.OptIn as AndroidOptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -87,7 +85,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.PictureInPictureModeChangedInfo
 import androidx.core.util.Consumer
 import androidx.core.view.WindowCompat
@@ -95,17 +92,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
-import androidx.media3.common.C
-import androidx.media3.common.Player
-import androidx.media3.common.TrackSelectionOverride
-import androidx.media3.common.Tracks
-import androidx.media3.common.VideoSize
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
 import com.scalari.fichiers.ui.vault.findActivity
 import kotlinx.coroutines.delay
-import java.util.Locale
 import kotlin.math.abs
 
 /** Format d'image : Ajuster (bandes noires), Remplir (rogne), Étirer. */
@@ -118,53 +106,41 @@ data class Hud(val icon: ImageVector, val text: String, val fraction: Float? = n
 
 private val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
 
-@AndroidOptIn(markerClass = [UnstableApi::class])
 @Composable
-fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: Long = 0L, allowPip: Boolean = true) {
+fun VideoPlayer(
+    engine: VideoEngine,
+    onBack: () -> Unit,
+    resumeFrom: Long = 0L,
+    allowPip: Boolean = true,
+    /** Proposé quand le moteur Android est utilisé : bascule sur VLC. */
+    onSwitchEngine: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
     val view = LocalView.current
     val activity = context.findActivity()
     val audio = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
 
-    // ---------- État du lecteur
-    var isPlaying by remember { mutableStateOf(player.isPlaying) }
-    var position by remember { mutableLongStateOf(player.currentPosition) }
-    var duration by remember { mutableLongStateOf(player.duration.coerceAtLeast(0)) }
-    var videoSize by remember { mutableStateOf(player.videoSize) }
-    var tracks by remember { mutableStateOf(player.currentTracks) }
-    var speed by remember { mutableFloatStateOf(player.playbackParameters.speed) }
-    var hasNext by remember { mutableStateOf(player.hasNextMediaItem()) }
-    var hasPrev by remember { mutableStateOf(player.hasPreviousMediaItem()) }
-    var currentTitle by remember { mutableStateOf(title) }
-    DisposableEffect(player) {
-        val l = object : Player.Listener {
-            override fun onEvents(p: Player, events: Player.Events) {
-                isPlaying = p.isPlaying
-                duration = p.duration.coerceAtLeast(0)
-                videoSize = p.videoSize
-                tracks = p.currentTracks
-                speed = p.playbackParameters.speed
-                hasNext = p.hasNextMediaItem()
-                hasPrev = p.hasPreviousMediaItem()
-                p.mediaMetadata.title?.toString()?.takeIf { it.isNotBlank() }?.let { currentTitle = it }
-                position = p.currentPosition
-            }
-        }
-        player.addListener(l)
-        onDispose { player.removeListener(l) }
-    }
-    LaunchedEffect(isPlaying) {
-        while (isPlaying) {
-            position = player.currentPosition
+    // ---------- État lu régulièrement sur le moteur (identique pour Android et VLC)
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(engine) {
+        while (true) {
+            tick++
             delay(250)
         }
     }
+    // Lire « tick » abonne la recomposition au rafraîchissement : les valeurs du moteur sont relues.
+    val refresh = tick
+    val isPlaying = engine.isPlaying
+    val position = engine.position
+    val duration = engine.duration
+    val videoW = engine.videoWidth
+    val videoH = engine.videoHeight
 
     // ---------- Reprise : mémorise la position régulièrement et en quittant
-    LaunchedEffect(player) {
+    LaunchedEffect(engine) {
         while (true) {
             delay(5_000)
-            player.currentMediaItem?.mediaId?.let { ResumeStore.save(context, it, player.currentPosition, player.duration) }
+            engine.mediaId.takeIf { it.isNotEmpty() }?.let { ResumeStore.save(context, it, engine.position, engine.duration) }
         }
     }
     var resumeBanner by remember { mutableStateOf(resumeFrom > 0) }
@@ -188,7 +164,6 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
         )
     }
 
-    // Masquage automatique des commandes pendant la lecture.
     LaunchedEffect(controls, isPlaying, interaction, dialog) {
         if (controls && isPlaying && dialog == null) {
             delay(3_500)
@@ -199,7 +174,7 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
     LaunchedEffect(hud) { if (hud != null) { delay(900); hud = null } }
 
     // ---------- Fenêtre : plein écran immersif, luminosité, orientation
-    DisposableEffect(Unit) {
+    DisposableEffect(engine) {
         val window = activity?.window
         val insets = window?.let { WindowCompat.getInsetsController(it, view) }
         insets?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -210,16 +185,17 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
                 w.attributes = w.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
             }
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            player.currentMediaItem?.mediaId?.let { ResumeStore.save(context, it, player.currentPosition, player.duration) }
-            if (activity?.isChangingConfigurations != true) player.pause()
+            engine.mediaId.takeIf { it.isNotEmpty() }?.let { ResumeStore.save(context, it, engine.position, engine.duration) }
+            if (activity?.isChangingConfigurations != true) engine.pause()
         }
     }
     // Vidéo plus large que haute : passage automatique en paysage (une fois par vidéo).
-    var autoRotated by remember { mutableStateOf<VideoSize?>(null) }
-    LaunchedEffect(videoSize) {
-        if (videoSize.width > 0 && autoRotated != videoSize) {
-            autoRotated = videoSize
-            activity?.requestedOrientation = if (videoSize.width > videoSize.height) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    var autoRotated by remember { mutableStateOf("") }
+    LaunchedEffect(videoW, videoH, engine.mediaId) {
+        val key = "${engine.mediaId}:$videoW:$videoH"
+        if (videoW > 0 && autoRotated != key) {
+            autoRotated = key
+            activity?.requestedOrientation = if (videoW > videoH) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
     }
@@ -227,15 +203,14 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
     // ---------- Image dans l'image
     fun pipParams(auto: Boolean): PictureInPictureParams? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
-        val w = videoSize.width.takeIf { it > 0 } ?: 16
-        val h = videoSize.height.takeIf { it > 0 } ?: 9
+        val w = videoW.takeIf { it > 0 } ?: 16
+        val h = videoH.takeIf { it > 0 } ?: 9
         val ratio = (w.toFloat() / h).coerceIn(1f / 2.39f, 2.39f)
         val b = PictureInPictureParams.Builder().setAspectRatio(Rational((ratio * 1000).toInt(), 1000))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) b.setAutoEnterEnabled(auto).setSeamlessResizeEnabled(true)
         return b.build()
     }
-    LaunchedEffect(isPlaying, videoSize) {
-        // Android 12+ : passe en fenêtre flottante en quittant l'appli pendant la lecture.
+    LaunchedEffect(isPlaying, videoW, videoH) {
         if (allowPip && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) pipParams(isPlaying)?.let { runCatching { activity?.setPictureInPictureParams(it) } }
     }
     DisposableEffect(activity) {
@@ -247,47 +222,26 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) pipParams(false)?.let { runCatching { activity?.setPictureInPictureParams(it) } }
         }
     }
-    // Fenêtre flottante fermée (croix) ou appli quittée hors fenêtre flottante : pause.
-    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (activity?.isInPictureInPictureMode != true) player.pause() }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) { if (activity?.isInPictureInPictureMode != true) engine.pause() }
 
     fun showControls() { controls = true; interaction++ }
     fun seekBy(ms: Long) {
-        val target = (player.currentPosition + ms).coerceIn(0, player.duration.coerceAtLeast(0))
-        player.seekTo(target)
-        position = target
+        val target = (engine.position + ms).coerceIn(0, engine.duration.coerceAtLeast(0))
+        engine.seekTo(target)
         hud = Hud(if (ms > 0) Icons.Filled.FastForward else Icons.Filled.FastRewind, "${if (ms > 0) "+" else "−"}${abs(ms) / 1000} s")
     }
     fun setBrightness(v: Float) {
         brightness = v.coerceIn(0.01f, 1f)
         activity?.window?.let { w -> w.attributes = w.attributes.apply { screenBrightness = brightness } }
     }
+    fun togglePlay() = if (engine.isPlaying) engine.pause() else engine.play()
 
     Box(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                    useController = false
-                    keepScreenOn = true
-                    setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                    this.player = player
-                }
-            },
-            update = {
-                it.player = player
-                it.resizeMode = when (fit) {
-                    FitMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    FitMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                    FitMode.STRETCH -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-                }
-            },
-            onRelease = { it.player = null },
-            modifier = Modifier.fillMaxSize(),
-        )
+        engine.VideoSurface(fit, Modifier.fillMaxSize())
 
         if (!inPip) {
             // ---------- Gestes
@@ -302,7 +256,7 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
             Box(
                 Modifier
                     .fillMaxSize()
-                    .pointerInput(locked) {
+                    .pointerInput(locked, engine) {
                         detectTapGestures(
                             onTap = {
                                 if (locked) showUnlock = true
@@ -313,25 +267,25 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
                                 when {
                                     o.x < size.width / 3f -> seekBy(-10_000)
                                     o.x > size.width * 2f / 3f -> seekBy(10_000)
-                                    else -> if (player.isPlaying) player.pause() else player.play()
+                                    else -> togglePlay()
                                 }
                             },
                         )
                     }
-                    .pointerInput(locked) {
+                    .pointerInput(locked, engine) {
                         if (locked) return@pointerInput
                         detectDragGestures(
                             onDragStart = { start ->
                                 gesture = Gesture.NONE
                                 acc = Offset.Zero
                                 startX = start.x
-                                seekStart = player.currentPosition
+                                seekStart = engine.position
                                 seekTarget = seekStart
                                 brightStart = brightness
                                 volStart = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
                             },
                             onDragEnd = {
-                                if (gesture == Gesture.SEEK) { player.seekTo(seekTarget); position = seekTarget }
+                                if (gesture == Gesture.SEEK) engine.seekTo(seekTarget)
                                 gesture = Gesture.NONE
                             },
                             onDragCancel = { gesture = Gesture.NONE },
@@ -348,9 +302,8 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
                                 }
                                 when (gesture) {
                                     Gesture.SEEK -> {
-                                        // Toute la largeur de l'écran = 90 secondes.
                                         val d = (acc.x / size.width * 90_000).toLong()
-                                        seekTarget = (seekStart + d).coerceIn(0, player.duration.coerceAtLeast(0))
+                                        seekTarget = (seekStart + d).coerceIn(0, engine.duration.coerceAtLeast(0))
                                         val diff = seekTarget - seekStart
                                         hud = Hud(
                                             if (diff >= 0) Icons.Filled.FastForward else Icons.Filled.FastRewind,
@@ -375,24 +328,26 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
 
             VideoControls(
                 visible = controls && !locked,
-                title = currentTitle,
+                title = engine.title,
                 isPlaying = isPlaying,
                 position = position,
                 duration = duration,
-                speed = speed,
+                speed = engine.speed,
                 fit = fit,
-                hasPrev = hasPrev,
-                hasNext = hasNext,
-                hasSubtitles = tracks.groups.any { it.type == C.TRACK_TYPE_TEXT },
-                hasAudioChoice = trackEntries(tracks, C.TRACK_TYPE_AUDIO).size > 1,
+                hasPrev = engine.hasPrev,
+                hasNext = engine.hasNext,
+                hasSubtitles = engine.textTracks().isNotEmpty(),
+                hasAudioChoice = engine.audioTracks().size > 1,
                 showPip = allowPip,
+                engineName = engine.engineName,
+                onSwitchEngine = onSwitchEngine,
                 onBack = onBack,
-                onPlayPause = { showControls(); if (player.isPlaying) player.pause() else player.play() },
-                onSeek = { showControls(); player.seekTo(it); position = it },
+                onPlayPause = { showControls(); togglePlay() },
+                onSeek = { showControls(); engine.seekTo(it) },
                 onRewind = { showControls(); seekBy(-10_000) },
                 onForward = { showControls(); seekBy(10_000) },
-                onPrev = { showControls(); player.seekToPreviousMediaItem() },
-                onNext = { showControls(); player.seekToNextMediaItem() },
+                onPrev = { showControls(); engine.prev() },
+                onNext = { showControls(); engine.next() },
                 onSpeed = { dialog = "speed" },
                 onSubtitles = { dialog = "text" },
                 onAudio = { dialog = "audio" },
@@ -406,7 +361,6 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
                 onPip = { pipParams(false)?.let { runCatching { activity?.enterPictureInPictureMode(it) } } },
             )
 
-            // Verrouillage : seul le cadenas reste accessible.
             AnimatedVisibility(locked && showUnlock, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.CenterStart)) {
                 Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.55f), modifier = Modifier.padding(24.dp)) {
                     IconButton(onClick = { locked = false; showControls() }, modifier = Modifier.size(56.dp)) {
@@ -429,8 +383,8 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
                         Text("Reprise à ${formatDuration(resumeFrom)}", color = Color.White, style = MaterialTheme.typography.bodyMedium)
                         TextButton(onClick = {
                             resumeBanner = false
-                            player.seekTo(0)
-                            player.currentMediaItem?.mediaId?.let { ResumeStore.clear(context, it) }
+                            engine.seekTo(0)
+                            engine.mediaId.takeIf { it.isNotEmpty() }?.let { ResumeStore.clear(context, it) }
                         }) { Text("Depuis le début") }
                     }
                 }
@@ -442,52 +396,27 @@ fun VideoPlayer(player: Player, title: String, onBack: () -> Unit, resumeFrom: L
     when (dialog) {
         "speed" -> ChoiceDialog(
             title = "Vitesse de lecture",
-            options = speeds.map { (if (it == 1f) "Normale" else "×" + it.toString().trimEnd('0').trimEnd('.').replace('.', ',')) to (it == speed) },
+            options = speeds.map { (if (it == 1f) "Normale" else "×" + it.toString().trimEnd('0').trimEnd('.').replace('.', ',')) to (abs(it - engine.speed) < 0.01f) },
             onDismiss = { dialog = null },
-            onPick = { i -> player.setPlaybackSpeed(speeds[i]); dialog = null },
+            onPick = { i -> engine.setSpeed(speeds[i]); dialog = null },
         )
-        "audio", "text" -> {
-            val type = if (dialog == "audio") C.TRACK_TYPE_AUDIO else C.TRACK_TYPE_TEXT
-            val entries = trackEntries(tracks, type)
-            val textOff = type == C.TRACK_TYPE_TEXT && entries.none { it.selected }
+        "audio" -> {
+            val list = engine.audioTracks()
             ChoiceDialog(
-                title = if (type == C.TRACK_TYPE_AUDIO) "Piste audio" else "Sous-titres",
-                options = (if (type == C.TRACK_TYPE_TEXT) listOf("Désactivés" to textOff) else emptyList()) +
-                    entries.map { it.label to it.selected },
+                title = "Piste audio",
+                options = list.map { it.label to it.selected },
                 onDismiss = { dialog = null },
-                onPick = { i ->
-                    val params = player.trackSelectionParameters.buildUpon()
-                    if (type == C.TRACK_TYPE_TEXT && i == 0) {
-                        params.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
-                    } else {
-                        val e = entries[if (type == C.TRACK_TYPE_TEXT) i - 1 else i]
-                        params.setTrackTypeDisabled(type, false)
-                            .setOverrideForType(TrackSelectionOverride(e.group.mediaTrackGroup, e.index))
-                    }
-                    player.trackSelectionParameters = params.build()
-                    dialog = null
-                },
+                onPick = { i -> engine.selectAudio(list[i]); dialog = null },
             )
         }
-    }
-}
-
-private data class TrackEntry(val group: Tracks.Group, val index: Int, val label: String, val selected: Boolean)
-
-private fun trackEntries(tracks: Tracks, type: Int): List<TrackEntry> {
-    var n = 0
-    return tracks.groups.filter { it.type == type }.flatMap { g ->
-        (0 until g.length).filter { g.isTrackSupported(it) }.map { i ->
-            n++
-            val f = g.getTrackFormat(i)
-            val lang = f.language?.takeIf { it != "und" }?.let { code ->
-                Locale.forLanguageTag(code).getDisplayLanguage(Locale.FRENCH).replaceFirstChar { it.uppercase() }
-            }
-            val extra = buildList {
-                if (type == C.TRACK_TYPE_AUDIO && f.channelCount > 0) add(if (f.channelCount >= 6) "5.1" else if (f.channelCount == 2) "stéréo" else "${f.channelCount} canaux")
-            }
-            val label = listOfNotNull(f.label ?: lang ?: "Piste $n", extra.joinToString().ifEmpty { null }).joinToString(" · ")
-            TrackEntry(g, i, label, g.isTrackSelected(i))
+        "text" -> {
+            val list = engine.textTracks()
+            ChoiceDialog(
+                title = "Sous-titres",
+                options = listOf("Désactivés" to list.none { it.selected }) + list.map { it.label to it.selected },
+                onDismiss = { dialog = null },
+                onPick = { i -> engine.selectText(if (i == 0) null else list[i - 1]); dialog = null },
+            )
         }
     }
 }
@@ -551,6 +480,8 @@ fun VideoControls(
     hasSubtitles: Boolean,
     hasAudioChoice: Boolean,
     showPip: Boolean = true,
+    engineName: String = "Android",
+    onSwitchEngine: (() -> Unit)? = null,
     onBack: () -> Unit = {},
     onPlayPause: () -> Unit = {},
     onSeek: (Long) -> Unit = {},
@@ -650,6 +581,11 @@ fun VideoControls(
                             style = MaterialTheme.typography.labelLarge,
                         )
                         Spacer(Modifier.weight(1f))
+                        if (onSwitchEngine != null) {
+                            TextButton(onClick = onSwitchEngine) { Text("Lire avec VLC", color = Color.White) }
+                        } else if (engineName == "VLC") {
+                            Text("VLC", color = Color.White.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp))
+                        }
                         IconButton(onClick = onLock) { Icon(Icons.Filled.Lock, "Verrouiller l'écran", tint = Color.White) }
                         TextButton(onClick = onFit) {
                             Icon(Icons.Filled.AspectRatio, null, tint = Color.White, modifier = Modifier.size(20.dp))
