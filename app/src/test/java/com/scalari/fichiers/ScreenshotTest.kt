@@ -35,6 +35,7 @@ import com.scalari.fichiers.data.StorageRoot
 import com.scalari.fichiers.data.ThemeMode
 import com.scalari.fichiers.ui.AppBottomBar
 import com.scalari.fichiers.ui.analyzer.AnalyzerContent
+import com.scalari.fichiers.ui.analyzer.BootAppsContent
 import com.scalari.fichiers.ui.analyzer.UsageSlice
 import com.scalari.fichiers.ui.player.AudioPlayerContent
 import com.scalari.fichiers.ui.player.MiniPlayer
@@ -254,6 +255,18 @@ class ScreenshotTest {
                 UsageSlice("Archives", 3_900_000_000, androidx.compose.ui.graphics.Color(0xFFB0793F)),
                 UsageSlice("Système et autres", 29_060_000_000, androidx.compose.ui.graphics.Color(0xFF9AA0AE)),
             ),
+        )
+    }
+
+    @Test fun boot_apps() = capture("15_demarrage") {
+        BootAppsContent(
+            apps = listOf(
+                com.scalari.fichiers.data.BootApp("com.ex.meteo", "Météo Plus", null, false, false, false, 1),
+                com.scalari.fichiers.data.BootApp("com.ex.vpn", "Mon VPN", null, false, true, false, 2),
+                com.scalari.fichiers.data.BootApp("com.ex.nettoyeur", "Super Nettoyeur", null, false, false, false, 1),
+                com.scalari.fichiers.data.BootApp("com.ex.sync", "Synchro Photos", null, false, false, true, 1),
+            ),
+            showSystem = false, onToggleSystem = {}, onSelect = {},
         )
     }
 

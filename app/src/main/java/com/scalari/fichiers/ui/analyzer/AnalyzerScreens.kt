@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -139,6 +140,7 @@ fun AnalyzerScreen(navigator: AppNavigator) {
             onApks = navigator::analyzerApks,
             onEmpty = navigator::analyzerEmpty,
             onLarge = { navigator.category(Category.LARGE) },
+            onBootApps = navigator::bootApps,
         )
     }
 }
@@ -154,6 +156,7 @@ fun AnalyzerContent(
     onApks: () -> Unit = {},
     onEmpty: () -> Unit = {},
     onLarge: () -> Unit = {},
+    onBootApps: () -> Unit = {},
 ) {
     Column(
         modifier
@@ -221,6 +224,8 @@ fun AnalyzerContent(
         ToolRow(Icons.Filled.Storage, Color(0xFFF07A1A), "Gros fichiers", "Fichiers de plus de 50 Mo", onLarge)
         ToolRow(Icons.Filled.Android, Color(0xFF5BA33B), "APK déjà installés", "Fichiers d'installation devenus inutiles", onApks)
         ToolRow(Icons.Filled.FolderOff, Color(0xFF607D8B), "Dossiers vides", "Dossiers sans aucun contenu", onEmpty)
+        Text("Système", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+        ToolRow(Icons.Filled.PowerSettingsNew, Color(0xFF0E9AA7), "Démarrage automatique", "Applis lancées au démarrage du téléphone", onBootApps)
     }
 }
 

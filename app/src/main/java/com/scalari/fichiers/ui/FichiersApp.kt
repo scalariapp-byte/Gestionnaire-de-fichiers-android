@@ -79,6 +79,7 @@ object Routes {
     const val ANALYZER_DUPLICATES = "analyzer/duplicates"
     const val ANALYZER_APKS = "analyzer/apks"
     const val ANALYZER_EMPTY = "analyzer/empty"
+    const val BOOT_APPS = "boot-apps"
     const val PLAYER = "player?path={path}&secure={secure}"
     fun player(path: String, secure: Boolean = false) = "player?path=${Uri.encode(path)}&secure=$secure"
     const val TAB_RECENT = "recent"
@@ -121,6 +122,7 @@ class AppNavigator(private val nav: NavHostController) {
     fun analyzerDuplicates() = nav.navigate(Routes.ANALYZER_DUPLICATES)
     fun analyzerApks() = nav.navigate(Routes.ANALYZER_APKS)
     fun analyzerEmpty() = nav.navigate(Routes.ANALYZER_EMPTY)
+    fun bootApps() = nav.navigate(Routes.BOOT_APPS)
     fun player(path: String, secure: Boolean = false) = nav.navigate(Routes.player(path, secure)) { launchSingleTop = true }
 
     /** Ouvre un fichier avec la visionneuse intégrée adaptée ; false s'il faut une appli externe. */
@@ -277,6 +279,7 @@ private fun AppNavHost() {
         composable(Routes.ANALYZER_DUPLICATES) { DuplicatesScreen(navigator) }
         composable(Routes.ANALYZER_APKS) { InstalledApksScreen(navigator) }
         composable(Routes.ANALYZER_EMPTY) { EmptyFoldersScreen(navigator) }
+        composable(Routes.BOOT_APPS) { com.scalari.fichiers.ui.analyzer.BootAppsScreen(onBack = navigator::back) }
         composable(Routes.TRASH) {
             TrashScreen(onBack = navigator::back)
         }
