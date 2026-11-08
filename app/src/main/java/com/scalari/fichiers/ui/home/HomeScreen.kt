@@ -215,7 +215,7 @@ fun HomeContent(
             Modifier.padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            tiles.chunked(3).forEach { row ->
+            tiles.chunked(2).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     row.forEach { (s, isFavorite) ->
                         ShortcutTile(
@@ -226,7 +226,7 @@ fun HomeContent(
                             onLongClick = if (isFavorite) ({ actions.onRemoveFavorite(s.path) }) else null,
                         )
                     }
-                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                    repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
@@ -411,39 +411,40 @@ private fun ShortcutTile(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
 ) {
-    Column(
+    Row(
         modifier
-            .clip(MaterialTheme.shapes.large)
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 10.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
-                .size(38.dp)
-                .background(shortcut.color.copy(alpha = 0.16f), RoundedCornerShape(12.dp)),
+                .size(36.dp)
+                .background(shortcut.color.copy(alpha = 0.16f), RoundedCornerShape(11.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(shortcut.icon, null, tint = shortcut.color, modifier = Modifier.size(21.dp))
+            Icon(shortcut.icon, null, tint = shortcut.color, modifier = Modifier.size(20.dp))
         }
-        Text(
-            shortcut.label,
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 10.dp),
-        )
-        Text(
-            when (count) {
-                null -> " "
-                0 -> "Vide"
-                1 -> "1 élément"
-                else -> "$count éléments"
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-        )
+        Column(Modifier.padding(start = 10.dp)) {
+            Text(
+                shortcut.label,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                when (count) {
+                    null -> " "
+                    0 -> "Vide"
+                    1 -> "1 élément"
+                    else -> "$count éléments"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
     }
 }
-

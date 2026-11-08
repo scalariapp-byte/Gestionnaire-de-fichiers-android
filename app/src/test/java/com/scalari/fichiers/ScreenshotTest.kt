@@ -125,15 +125,8 @@ class ScreenshotTest {
             ),
             shortcuts = defaultShortcuts(),
             favorites = listOf("/storage/emulated/0/Documents/Travail"),
-            counts = mapOf(
-                "/storage/emulated/0/Documents/Travail" to 10,
-                "/storage/emulated/0/Download" to 37,
-                "/storage/emulated/0/DCIM" to 2,
-                "/storage/emulated/0/Documents" to 14,
-                "/storage/emulated/0/Pictures" to 6,
-                "/storage/emulated/0/Music" to 128,
-                "/storage/emulated/0/Movies" to 0,
-            ),
+            counts = (listOf("/storage/emulated/0/Documents/Travail") + defaultShortcuts().map { it.path })
+                .zip(listOf(10, 37, 2, 14, 6, 128, 0)).toMap(),
             actions = HomeActions(),
         )
     }
