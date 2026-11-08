@@ -54,6 +54,11 @@ import com.scalari.fichiers.ui.home.HomeScreen
 import com.scalari.fichiers.ui.permission.PermissionScreen
 import com.scalari.fichiers.ui.settings.SettingsScreen
 import com.scalari.fichiers.ui.trash.TrashScreen
+import com.scalari.fichiers.ui.analyzer.AnalyzerScreen
+import com.scalari.fichiers.ui.analyzer.DuplicatesScreen
+import com.scalari.fichiers.ui.analyzer.EmptyFoldersScreen
+import com.scalari.fichiers.ui.analyzer.FolderSizesScreen
+import com.scalari.fichiers.ui.analyzer.InstalledApksScreen
 import com.scalari.fichiers.ui.vault.VaultScreen
 import com.scalari.fichiers.data.vault.VaultManager
 import com.scalari.fichiers.ui.viewer.ImageViewerScreen
@@ -69,8 +74,13 @@ object Routes {
     const val IMAGE = "image?path={path}&secure={secure}"
     const val VAULT = "vault"
     const val TAB_FILES = "files"
-    const val PLAYER = "player?path={path}"
-    fun player(path: String) = "player?path=${Uri.encode(path)}"
+    const val ANALYZER = "analyzer"
+    const val ANALYZER_FOLDERS = "analyzer/folders?path={path}"
+    const val ANALYZER_DUPLICATES = "analyzer/duplicates"
+    const val ANALYZER_APKS = "analyzer/apks"
+    const val ANALYZER_EMPTY = "analyzer/empty"
+    const val PLAYER = "player?path={path}&secure={secure}"
+    fun player(path: String, secure: Boolean = false) = "player?path=${Uri.encode(path)}&secure=$secure"
     const val TAB_RECENT = "recent"
     const val TRASH = "trash"
     const val SETTINGS = "settings"
@@ -106,7 +116,12 @@ class AppNavigator(private val nav: NavHostController) {
     fun text(path: String) = nav.navigate(Routes.text(path))
     fun image(path: String, secure: Boolean = false) = nav.navigate(Routes.image(path, secure))
     fun vault() = tab(Tab.VAULT)
-    fun player(path: String) = nav.navigate(Routes.player(path)) { launchSingleTop = true }
+    fun analyzer() = nav.navigate(Routes.ANALYZER)
+    fun analyzerFolders(path: String?) = nav.navigate("analyzer/folders?path=${Uri.encode(path ?: "")}")
+    fun analyzerDuplicates() = nav.navigate(Routes.ANALYZER_DUPLICATES)
+    fun analyzerApks() = nav.navigate(Routes.ANALYZER_APKS)
+    fun analyzerEmpty() = nav.navigate(Routes.ANALYZER_EMPTY)
+    fun player(path: String, secure: Boolean = false) = nav.navigate(Routes.player(path, secure)) { launchSingleTop = true }
 
     /** Ouvre un fichier avec la visionneuse intégrée adaptée ; false s'il faut une appli externe. */
     fun openInternal(item: com.scalari.fichiers.data.FileItem): Boolean = when {
@@ -245,9 +260,23 @@ private fun AppNavHost() {
         composable(Routes.TAB_RECENT) {
             CategoryScreen(Category.RECENT, navigator, isTab = true)
         }
-        composable(Routes.PLAYER, arguments = listOf(pathArg)) { e ->
-            PlayerScreen(e.arguments?.getString("path") ?: "", onBack = navigator::back)
+        composable(
+            Routes.PLAYER,
+            arguments = listOf(pathArg, navArgument("secure") { type = NavType.BoolType; defaultValue = false }),
+        ) { e ->
+            PlayerScreen(
+                e.arguments?.getString("path") ?: "",
+                onBack = navigator::back,
+                secure = e.arguments?.getBoolean("secure") ?: false,
+            )
         }
+        composable(Routes.ANALYZER) { AnalyzerScreen(navigator) }
+        composable(Routes.ANALYZER_FOLDERS, arguments = listOf(pathArg)) { e ->
+            FolderSizesScreen(e.arguments?.getString("path")?.takeIf { it.isNotEmpty() }, navigator)
+        }
+        composable(Routes.ANALYZER_DUPLICATES) { DuplicatesScreen(navigator) }
+        composable(Routes.ANALYZER_APKS) { InstalledApksScreen(navigator) }
+        composable(Routes.ANALYZER_EMPTY) { EmptyFoldersScreen(navigator) }
         composable(Routes.TRASH) {
             TrashScreen(onBack = navigator::back)
         }

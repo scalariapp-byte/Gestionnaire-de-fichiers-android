@@ -291,7 +291,24 @@ object OperationManager {
         }
 
     fun extract(zip: File, parentDir: File) = run("Extraction") { touched ->
-        val dest = FileOps.uniqueFile(parentDir, zip.nameWithoutExtension)
+        val dest = FileOps.uniqueFile(parentDir, ArchiveExtractor.baseName(zip.name))
+        if (!ArchiveExtractor.isZip(zip.name)) {
+            if (!dest.mkdirs()) throw IOException("Impossible de créer ${dest.name}")
+            val ctx = currentCoroutineContext()
+            val t = Tracker("Extraction", 0, 0)
+            try {
+                val files = ArchiveExtractor.extract(zip, dest, cancel = { ctx.ensureActive() }) { done, total, name ->
+                    t.totalBytes = total
+                    t.bytes = done
+                    t.update(name)
+                }
+                files.take(MAX_SCAN).forEach { touched += it.absolutePath }
+            } catch (e: Throwable) {
+                dest.deleteRecursively()
+                throw e
+            }
+            return@run "Extrait dans « ${dest.name} »"
+        }
         if (!dest.mkdirs()) throw IOException("Impossible de créer ${dest.name}")
         val destCanonical = dest.canonicalPath + File.separator
         try {

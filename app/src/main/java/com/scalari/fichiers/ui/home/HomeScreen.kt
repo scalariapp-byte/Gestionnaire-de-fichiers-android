@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.SdCard
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -132,6 +133,7 @@ class HomeActions(
     val onRemoveFavorite: (String) -> Unit = {},
     val onVault: () -> Unit = {},
     val onTrash: () -> Unit = {},
+    val onAnalyze: () -> Unit = {},
 )
 
 @Composable
@@ -159,6 +161,7 @@ fun HomeScreen(navigator: AppNavigator) {
         },
         onVault = navigator::vault,
         onTrash = navigator::trash,
+        onAnalyze = navigator::analyzer,
     )
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
@@ -195,7 +198,7 @@ fun HomeContent(
         Header(actions)
 
         val primary = roots.firstOrNull { it.isPrimary } ?: roots.firstOrNull()
-        if (primary != null) StorageCompact(primary, others = roots - primary, onOpen = actions.onOpenPath)
+        if (primary != null) StorageCompact(primary, others = roots - primary, onOpen = actions.onOpenPath, onAnalyze = actions.onAnalyze)
 
         SectionTitle("Catégories")
         Column(Modifier.padding(horizontal = 12.dp)) {
@@ -258,7 +261,7 @@ private fun Header(actions: HomeActions) {
 }
 
 @Composable
-private fun StorageCompact(root: StorageRoot, others: List<StorageRoot>, onOpen: (String) -> Unit) {
+private fun StorageCompact(root: StorageRoot, others: List<StorageRoot>, onOpen: (String) -> Unit, onAnalyze: () -> Unit) {
     val fraction = percent(root)
     Column(
         Modifier
@@ -293,14 +296,22 @@ private fun StorageCompact(root: StorageRoot, others: List<StorageRoot>, onOpen:
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.85f),
                 )
-            }
-            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.18f)) {
                 Text(
                     "${formatSize(root.free)} libres",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.75f),
                 )
+            }
+            Surface(onClick = onAnalyze, shape = CircleShape, color = Color.White.copy(alpha = 0.2f)) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.PieChart, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Text(
+                        "Analyser",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
             }
         }
         others.forEach { other ->

@@ -88,7 +88,8 @@ import java.io.File
  * dans l'ordre naturel des noms. Si [path] est vide, affiche simplement la lecture en cours.
  */
 @Composable
-fun PlayerScreen(path: String, onBack: () -> Unit) {
+fun PlayerScreen(path: String, onBack: () -> Unit, secure: Boolean = false) {
+    if (secure) com.scalari.fichiers.ui.vault.SecureWindow()
     val context = LocalContext.current
     LaunchedEffect(Unit) { PlayerConnection.connect(context) }
     val controller by PlayerConnection.controller.collectAsStateWithLifecycle()
@@ -99,7 +100,7 @@ fun PlayerScreen(path: String, onBack: () -> Unit) {
     // Notifications (Android 13+) : nécessaires pour les commandes de lecture en arrière-plan.
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     LaunchedEffect(requestedType) {
-        if (requestedType == FileType.AUDIO && Build.VERSION.SDK_INT >= 33) {
+        if (!secure && requestedType == FileType.AUDIO && Build.VERSION.SDK_INT >= 33) {
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
@@ -109,14 +110,14 @@ fun PlayerScreen(path: String, onBack: () -> Unit) {
         if (started) return@LaunchedEffect
         val file = File(path)
         val showHidden = FileManagerApp.instance.settingsState.value.showHidden
-        val playlist = withContext(Dispatchers.IO) {
+        val playlist = if (secure) listOf(file) else withContext(Dispatchers.IO) {
             file.parentFile?.listFiles()
                 ?.filter { it.isFile && FileTypes.of(it.name, false) == requestedType && (showHidden || !it.name.startsWith(".")) }
                 ?.sortedWith(compareBy<File, String>(NaturalOrder) { it.name })
                 ?: emptyList()
         }.ifEmpty { listOf(file) }
         val start = playlist.indexOfFirst { it.absolutePath == file.absolutePath }.coerceAtLeast(0)
-        c.setMediaItems(playlist.map(PlayerConnection::mediaItem), start, 0L)
+        c.setMediaItems(playlist.map { PlayerConnection.mediaItem(it, if (secure) "Contenu protégé" else null) }, start, 0L)
         c.prepare()
         c.play()
         started = true

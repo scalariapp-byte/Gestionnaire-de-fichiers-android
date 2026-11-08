@@ -41,10 +41,24 @@ object PlayerConnection {
         f.addListener({ runCatching { _controller.value = f.get() } }, ContextCompat.getMainExecutor(app))
     }
 
-    fun mediaItem(file: File): MediaItem = MediaItem.Builder()
-        .setMediaId(file.absolutePath)
-        .setMediaMetadata(MediaMetadata.Builder().setTitle(file.nameWithoutExtension).setDisplayTitle(file.nameWithoutExtension).build())
-        .build()
+    /** [hiddenTitle] : titre affiché à la place du nom (notification, écran verrouillé) pour le coffre. */
+    fun mediaItem(file: File, hiddenTitle: String? = null): MediaItem {
+        val title = hiddenTitle ?: file.nameWithoutExtension
+        return MediaItem.Builder()
+            .setMediaId(file.absolutePath)
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setDisplayTitle(title).setArtist(if (hiddenTitle != null) "Coffre-fort" else null).build())
+            .build()
+    }
+
+    /** Arrête la lecture si le média en cours est situé sous [dir]. */
+    fun stopIfUnder(dir: File) {
+        val c = _controller.value ?: return
+        val id = c.currentMediaItem?.mediaId ?: return
+        if (id.startsWith(dir.absolutePath)) {
+            c.stop()
+            c.clearMediaItems()
+        }
+    }
 }
 
 /** Instantané de l'état du lecteur, pour l'affichage. */

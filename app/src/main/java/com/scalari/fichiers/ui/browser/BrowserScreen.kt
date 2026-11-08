@@ -201,7 +201,7 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
     fun open(item: FileItem) {
         when {
             item.isDirectory -> goTo(item.file)
-            item.extension == "zip" -> dialog = BrowserDialog.Archive(item)
+            com.scalari.fichiers.data.ArchiveExtractor.isArchive(item.name) -> dialog = BrowserDialog.Archive(item)
             navigator.openInternal(item) -> Unit
             !FileOpener.openExternal(context, item.file) -> message("Aucune application pour ouvrir ce fichier")
         }

@@ -34,6 +34,8 @@ import com.scalari.fichiers.data.MediaQueries
 import com.scalari.fichiers.data.StorageRoot
 import com.scalari.fichiers.data.ThemeMode
 import com.scalari.fichiers.ui.AppBottomBar
+import com.scalari.fichiers.ui.analyzer.AnalyzerContent
+import com.scalari.fichiers.ui.analyzer.UsageSlice
 import com.scalari.fichiers.ui.player.AudioPlayerContent
 import com.scalari.fichiers.ui.player.MiniPlayer
 import com.scalari.fichiers.ui.player.PlayerUiState
@@ -238,6 +240,21 @@ class ScreenshotTest {
                 AppBottomBar(Tab.HOME) {}
             }
         }) { p -> Column(Modifier.padding(p)) { Home() } }
+    }
+
+    @Test fun analyzer() = capture("14_analyse") {
+        AnalyzerContent(
+            root = StorageRoot(base, "Stockage interne", true, false, 128_000_000_000, 46_300_000_000),
+            slices = listOf(
+                UsageSlice("Images", 9_800_000_000, androidx.compose.ui.graphics.Color(0xFF2E9E5B)),
+                UsageSlice("Vidéos", 31_000_000_000, androidx.compose.ui.graphics.Color(0xFFE5484D)),
+                UsageSlice("Audio", 6_100_000_000, androidx.compose.ui.graphics.Color(0xFF8E4EC6)),
+                UsageSlice("Documents", 1_200_000_000, androidx.compose.ui.graphics.Color(0xFF3E7BFA)),
+                UsageSlice("APK", 640_000_000, androidx.compose.ui.graphics.Color(0xFF5BA33B)),
+                UsageSlice("Archives", 3_900_000_000, androidx.compose.ui.graphics.Color(0xFFB0793F)),
+                UsageSlice("Système et autres", 29_060_000_000, androidx.compose.ui.graphics.Color(0xFF9AA0AE)),
+            ),
+        )
     }
 
     @Test fun settings() = capture("08_parametres") { SettingsScreen(onBack = {}) }

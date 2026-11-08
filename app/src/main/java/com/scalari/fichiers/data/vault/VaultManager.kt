@@ -49,6 +49,10 @@ object VaultManager {
     private const val META = "meta.json"
     private const val INDEX = "index.bin"
     private val INDEX_AAD = "index".toByteArray()
+    private val THUMB_AAD = "thumb".toByteArray()
+
+    /** Vignettes déchiffrées en mémoire, vidées au verrouillage. */
+    private val thumbCache = android.util.LruCache<String, android.graphics.Bitmap>(120)
     private val DEK_AAD = "dek".toByteArray()
     private const val MIN_PIN = 4
 
@@ -165,10 +169,43 @@ object VaultManager {
     }
 
     fun lock(context: Context) {
+        if (key != null || tempDir(context).exists()) {
+            // Arrête une lecture en cours d'un fichier du coffre (sa copie déchiffrée va être effacée).
+            com.scalari.fichiers.ui.player.PlayerConnection.stopIfUnder(tempDir(context))
+        }
         key = null
         entries = emptyList()
+        thumbCache.evictAll()
         clearTemp(context)
         refreshState()
+    }
+
+    // ------------------------------------------------------------------ Vignettes
+
+    private fun thumbFile(id: String) = File(dataDir, "$id.thumb")
+
+    private fun writeThumb(k: SecretKey, id: String, jpeg: ByteArray) {
+        runCatching { atomicWrite(thumbFile(id), VaultCrypto.seal(k, jpeg, THUMB_AAD)) }
+    }
+
+    /**
+     * Vignette d'une image/vidéo du coffre (déchiffrée en mémoire). Pour les fichiers ajoutés
+     * avant l'existence des vignettes, elle est créée une fois à partir d'une copie temporaire.
+     */
+    fun thumbnail(context: Context, entry: VaultEntry): android.graphics.Bitmap? {
+        thumbCache.get(entry.id)?.let { return it }
+        val k = key ?: return null
+        if (!Thumbnails.canThumbnail(entry.name)) return null
+        val f = thumbFile(entry.id)
+        val jpeg = if (f.exists()) {
+            runCatching { VaultCrypto.open(k, f.readBytes(), THUMB_AAD) }.getOrNull()
+        } else {
+            val temp = runCatching { openTemp(context, entry) }.getOrNull() ?: return null
+            Thumbnails.create(temp, entry.name)?.also { writeThumb(k, entry.id, it) }
+        } ?: return null
+        val bmp = android.graphics.BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size) ?: return null
+        thumbCache.put(entry.id, bmp)
+        return bmp
     }
 
     // ------------------------------------------------------------------ Index
@@ -220,10 +257,14 @@ object VaultManager {
             file.inputStream().use { input ->
                 blob.outputStream().use { out -> VaultCrypto.encryptStream(k, input, out.buffered(), onProgress) }
             }
+            if (Thumbnails.canThumbnail(displayName)) {
+                Thumbnails.create(file, displayName)?.let { writeThumb(k, id, it) }
+            }
             entries = entries + VaultEntry(id, displayName, file.absolutePath, file.length(), file.lastModified(), System.currentTimeMillis())
             saveIndex()
         } catch (e: Throwable) {
             blob.delete()
+            thumbFile(id).delete()
             entries = entries.filterNot { it.id == id }
             throw e
         }
@@ -259,6 +300,8 @@ object VaultManager {
     fun remove(entry: VaultEntry) {
         requireKey()
         File(dataDir, entry.id).delete()
+        thumbFile(entry.id).delete()
+        thumbCache.remove(entry.id)
         entries = entries.filterNot { it.id == entry.id }
         saveIndex()
     }

@@ -61,6 +61,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -306,6 +308,8 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
                 onSuccess = { f ->
                     if (entry.type == FileType.IMAGE) {
                         navigator.image(f.absolutePath, secure = true)
+                    } else if (entry.type == FileType.VIDEO || entry.type == FileType.AUDIO) {
+                        navigator.player(f.absolutePath, secure = true)
                     } else {
                         VaultManager.externalOpen = true
                         if (!FileOpener.openExternal(context, f)) {
@@ -432,18 +436,36 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
                                 containerColor = if (isSel) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
                             ),
                             leadingContent = {
+                                val thumb by produceState<android.graphics.Bitmap?>(null, entry.id) {
+                                    value = withContext(Dispatchers.IO) { VaultManager.thumbnail(context, entry) }
+                                }
                                 Box(
                                     Modifier
-                                        .size(46.dp)
-                                        .clip(RoundedCornerShape(10.dp))
+                                        .size(52.dp)
+                                        .clip(RoundedCornerShape(12.dp))
                                         .background(entry.type.tint().copy(alpha = 0.14f)),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Icon(
-                                        if (isSel) Icons.Filled.CheckCircle else entry.type.icon(),
-                                        null,
-                                        tint = if (isSel) MaterialTheme.colorScheme.primary else entry.type.tint(),
-                                    )
+                                    val t = thumb
+                                    if (t != null) {
+                                        androidx.compose.foundation.Image(
+                                            t.asImageBitmap(), null,
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize(),
+                                        )
+                                    } else {
+                                        Icon(entry.type.icon(), null, tint = entry.type.tint())
+                                    }
+                                    if (isSel) {
+                                        Icon(
+                                            Icons.Filled.CheckCircle, null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .size(20.dp)
+                                                .background(MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape),
+                                        )
+                                    }
                                 }
                             },
                             headlineContent = { Text(entry.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },

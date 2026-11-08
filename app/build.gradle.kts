@@ -13,8 +13,8 @@ android {
         applicationId = "com.scalari.fichiers"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.6.0"
+        versionCode = 8
+        versionName = "1.7.0"
     }
 
     buildTypes {
@@ -81,6 +81,11 @@ dependencies {
     implementation("androidx.media3:media3-ui:$media3")
     implementation("androidx.media3:media3-session:$media3")
     implementation("com.google.guava:guava:33.3.1-android")
+
+    // Archives : 7z, TAR (gz/bz2/xz) et RAR4.
+    implementation("org.apache.commons:commons-compress:1.27.1")
+    implementation("org.tukaani:xz:1.10")
+    implementation("com.github.junrar:junrar:7.5.5")
 
     // Captures d'écran de l'interface rendues sur JVM (Robolectric) pour la revue visuelle.
     testImplementation("junit:junit:4.13.2")
