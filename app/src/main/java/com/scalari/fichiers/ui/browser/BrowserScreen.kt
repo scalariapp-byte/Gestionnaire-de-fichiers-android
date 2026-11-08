@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -378,7 +379,7 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         @Composable
-                        fun FileEntry(item: FileItem) = FileRow(
+                        fun LazyItemScope.FileEntry(item: FileItem) = FileRow(
                             modifier = Modifier.animateItem(),
                             item = item,
                             selected = item.path in state.selected,
