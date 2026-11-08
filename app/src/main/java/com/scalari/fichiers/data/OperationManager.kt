@@ -86,7 +86,8 @@ object OperationManager {
         }
     }
 
-    private fun run(title: String, block: suspend (touched: MutableSet<String>) -> String) {
+    /** [quiet] : pas de message de réussite (les erreurs restent signalées). */
+    private fun run(title: String, quiet: Boolean = false, block: suspend (touched: MutableSet<String>) -> String) {
         if (isBusy) {
             _messages.tryEmit("Une opération est déjà en cours")
             return
@@ -95,7 +96,8 @@ object OperationManager {
         job = scope.launch {
             val touched = LinkedHashSet<String>()
             try {
-                _messages.emit(block(touched))
+                val message = block(touched)
+                if (!quiet) _messages.emit(message)
             } catch (e: CancellationException) {
                 _messages.tryEmit("Opération annulée")
                 throw e
@@ -198,7 +200,7 @@ object OperationManager {
     // ---------------------------------------------------------------- Suppression
 
     fun delete(files: List<File>, toTrash: Boolean) =
-        run(if (toTrash) "Mise à la corbeille" else "Suppression") { touched ->
+        run(if (toTrash) "Mise à la corbeille" else "Suppression", quiet = true) { touched ->
             val ctx = FileManagerApp.instance
             val t = Tracker(if (toTrash) "Mise à la corbeille" else "Suppression", 0, files.size)
             files.forEachIndexed { i, f ->
@@ -226,7 +228,7 @@ object OperationManager {
         "${plural(entries.size, "élément")} restauré${if (entries.size > 1) "s" else ""}"
     }
 
-    fun deleteFromTrash(entries: List<TrashEntry>) = run("Suppression définitive") { _ ->
+    fun deleteFromTrash(entries: List<TrashEntry>) = run("Suppression définitive", quiet = true) { _ ->
         val t = Tracker("Suppression définitive", 0, entries.size)
         entries.forEachIndexed { i, e ->
             currentCoroutineContext().ensureActive()
@@ -398,7 +400,7 @@ object OperationManager {
         "${plural(entries.size, "fichier")} restauré${if (entries.size > 1) "s" else ""}"
     }
 
-    fun vaultDelete(entries: List<VaultEntry>) = run("Suppression") { _ ->
+    fun vaultDelete(entries: List<VaultEntry>) = run("Suppression", quiet = true) { _ ->
         entries.forEach {
             currentCoroutineContext().ensureActive()
             VaultManager.remove(it)

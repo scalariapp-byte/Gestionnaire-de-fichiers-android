@@ -158,7 +158,19 @@ fun FichiersApp() {
             } else {
                 AppNavHost()
             }
-            progress?.let { OperationProgressDialog(it, onCancel = OperationManager::cancel) }
+            // N'apparaît que si l'opération dure plus de 600 ms : rien ne clignote pour une
+            // suppression ou un déplacement instantané.
+            var showProgress by remember { mutableStateOf(false) }
+            val busy = progress != null
+            LaunchedEffect(busy) {
+                if (busy) {
+                    kotlinx.coroutines.delay(600)
+                    showProgress = true
+                } else {
+                    showProgress = false
+                }
+            }
+            if (showProgress) progress?.let { OperationProgressDialog(it, onCancel = OperationManager::cancel) }
         }
     }
 }
