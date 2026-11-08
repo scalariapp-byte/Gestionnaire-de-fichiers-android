@@ -19,7 +19,7 @@ import kotlinx.coroutines.withContext
 
 val HOME_CATEGORIES = listOf(
     Category.IMAGES, Category.VIDEOS, Category.AUDIO, Category.DOCUMENTS,
-    Category.ARCHIVES, Category.APKS, Category.LARGE, Category.RECENT,
+    Category.ARCHIVES, Category.APKS, Category.LARGE,
 )
 
 class HomeViewModel(app: Application) : AndroidViewModel(app) {

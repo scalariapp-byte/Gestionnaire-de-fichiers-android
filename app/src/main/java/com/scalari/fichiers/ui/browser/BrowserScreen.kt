@@ -181,16 +181,18 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
         if (FileOps.isInside(dir, state.currentDir)) positions.remove(dir.absolutePath)
         vm.navigateTo(dir)
     }
-    fun goUp() {
+    fun goBack() {
         savePosition()
-        vm.navigateUp()
+        vm.goBack()
     }
 
-    BackHandler(enabled = state.selectionMode || state.searchActive || !state.atRoot) {
+    // Retour : annule la sélection, ferme la recherche, revient au dossier précédent ;
+    // sans historique, l'écran se ferme et on revient d'où l'on vient (accueil…).
+    BackHandler(enabled = state.selectionMode || state.searchActive || state.canGoBack) {
         when {
             state.selectionMode -> vm.clearSelection()
             state.searchActive -> vm.setSearchActive(false)
-            else -> goUp()
+            else -> goBack()
         }
     }
 
@@ -244,8 +246,8 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                         }
                     },
                     navigationIcon = {
-                        if (!isTab || !state.atRoot) {
-                            IconButton(onClick = { if (isTab) goUp() else navigator.back() }) {
+                        if (!isTab || state.canGoBack) {
+                            IconButton(onClick = { if (state.canGoBack) goBack() else navigator.back() }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour")
                             }
                         }

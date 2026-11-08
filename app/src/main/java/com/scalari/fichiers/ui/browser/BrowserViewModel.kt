@@ -39,6 +39,8 @@ data class BrowserUiState(
     val searchQuery: String = "",
     val searchResults: List<FileItem>? = null,
     val searching: Boolean = false,
+    /** Vrai s'il y a un dossier précédent dans l'historique (le bouton Retour y revient). */
+    val canGoBack: Boolean = false,
 ) {
     val visibleItems: List<FileItem> get() = searchResults ?: items
     val selectionMode: Boolean get() = selected.isNotEmpty()
@@ -108,23 +110,27 @@ class BrowserViewModel(app: Application, startPath: String?, openSearch: Boolean
         }
     }
 
-    fun navigateTo(dir: File) {
+    /** Dossiers visités avant le dossier courant, comme l'historique d'un navigateur web. */
+    private val history = ArrayDeque<File>()
+
+    fun navigateTo(dir: File, addToHistory: Boolean = true) {
         searchJob?.cancel()
+        val current = _state.value.currentDir
+        if (addToHistory && current.absolutePath != dir.absolutePath) history.addLast(current)
         _state.update {
             it.copy(
                 currentDir = dir, items = emptyList(), loading = true, error = null,
                 selected = emptySet(), searchActive = false, searchQuery = "", searchResults = null, searching = false,
+                canGoBack = history.isNotEmpty(),
             )
         }
         load(dir)
     }
 
-    /** Remonte d'un niveau ; false si on est déjà à la racine du volume. */
-    fun navigateUp(): Boolean {
-        val st = _state.value
-        if (st.atRoot) return false
-        val parent = st.currentDir.parentFile ?: return false
-        navigateTo(parent)
+    /** Revient au dossier précédent de l'historique ; false s'il n'y en a pas (on quitte l'écran). */
+    fun goBack(): Boolean {
+        val previous = history.removeLastOrNull() ?: return false
+        navigateTo(previous, addToHistory = false)
         return true
     }
 

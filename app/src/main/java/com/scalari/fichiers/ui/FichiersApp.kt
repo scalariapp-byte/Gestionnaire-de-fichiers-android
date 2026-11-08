@@ -88,10 +88,18 @@ class AppNavigator(private val nav: NavHostController) {
     fun back() { nav.popBackStack() }
 
     /** Changement d'onglet : une seule copie par onglet, état conservé (défilement, dossier). */
-    fun tab(tab: Tab) = nav.navigate(tab.route) {
-        popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
+    fun tab(tab: Tab) {
+        if (tab == Tab.HOME) {
+            // L'accueil vide toujours la pile : on y revient quel que soit l'écran ouvert.
+            nav.popBackStack(nav.graph.findStartDestination().id, inclusive = false)
+            return
+        }
+        if (nav.currentDestination?.route == tab.route) return
+        nav.navigate(tab.route) {
+            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
     }
     fun browser(path: String?, search: Boolean = false) = nav.navigate(Routes.browser(path, search))
     fun category(c: Category) = if (c == Category.RECENT) tab(Tab.RECENT) else nav.navigate(Routes.category(c))

@@ -27,7 +27,7 @@ enum class Tab(val route: String, val label: String, val selectedIcon: ImageVect
 
 /** Onglet correspondant à une route ; l'explorateur ouvert depuis l'accueil compte comme « Fichiers ». */
 fun tabForRoute(route: String?): Tab? = when (route) {
-    Routes.HOME -> Tab.HOME
+    Routes.HOME, Routes.CATEGORY -> Tab.HOME
     Routes.TAB_FILES, Routes.BROWSER -> Tab.FILES
     Routes.TAB_RECENT -> Tab.RECENT
     Routes.VAULT -> Tab.VAULT
