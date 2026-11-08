@@ -160,6 +160,22 @@ fun SettingsScreen(onBack: () -> Unit) {
                     supportingContent = { Text("Ouvrir les réglages Android") },
                 )
             }
+            // Raccourci vers Isolateur (appli liée : blocage du démarrage auto, applis isolées).
+            val isoIntent = remember { context.packageManager.getLaunchIntentForPackage("com.isolapp.manager") }
+            ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                modifier = Modifier.clickable {
+                    val i = isoIntent ?: android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse("https://github.com/scalariapp-byte/App-isol-/releases/download/latest/Isolateur.apk"),
+                    )
+                    runCatching { context.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                },
+                headlineContent = { Text("Isolateur") },
+                supportingContent = {
+                    Text(if (isoIntent != null) "Ouvrir Isolateur (espace isolé, démarrage auto)" else "Non installé · Télécharger")
+                },
+            )
             ListItem(
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = { Text("Version") },
