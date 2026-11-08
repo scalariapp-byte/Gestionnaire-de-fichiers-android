@@ -5,6 +5,8 @@ package com.scalari.fichiers
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -24,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.scalari.fichiers.data.AppSettings
 import com.scalari.fichiers.data.Category
@@ -290,5 +293,11 @@ class ScreenshotTest {
     }
 
     @Test fun settings() = capture("08_parametres") { SettingsScreen(onBack = {}) }
-    @Test fun share_qr() = capture("17_partage_qr") { com.scalari.fichiers.ui.settings.QrCodeDialog(onDismiss = {}) }
+    @Test fun share_qr() = capture("17_partage_qr") { androidx.compose.material3.Surface(Modifier.padding(24.dp), shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+            Column(Modifier.padding(24.dp)) {
+                Text("Télécharger Mes fichiers", style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(16.dp))
+                com.scalari.fichiers.ui.settings.QrCodeContent()
+            }
+        } }
 }

@@ -60,11 +60,17 @@ object ShareApp {
 
 @Composable
 fun QrCodeDialog(onDismiss: () -> Unit) {
-    val bitmap = remember { ShareApp.qrCode() }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Télécharger Mes fichiers") },
-        text = {
+        text = { QrCodeContent() },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Fermer") } },
+    )
+}
+
+@Composable
+fun QrCodeContent() {
+    val bitmap = remember { ShareApp.qrCode() }
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(
                     Modifier
@@ -80,7 +86,4 @@ fun QrCodeDialog(onDismiss: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Fermer") } },
-    )
 }
