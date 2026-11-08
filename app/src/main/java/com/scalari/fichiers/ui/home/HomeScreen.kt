@@ -110,17 +110,17 @@ private fun Category.style(): CategoryStyle = when (this) {
     Category.RECENT -> CategoryStyle(Icons.Filled.History, Color(0xFF0E9AA7))
 }
 
-data class Shortcut(val label: String, val icon: ImageVector, val path: String)
+data class Shortcut(val label: String, val icon: ImageVector, val path: String, val color: Color = Color(0xFF3E7BFA))
 
 fun defaultShortcuts(): List<Shortcut> {
     val base = Environment.getExternalStorageDirectory()
     return listOf(
-        Shortcut("Téléchargements", Icons.Filled.Download, File(base, Environment.DIRECTORY_DOWNLOADS).absolutePath),
-        Shortcut("Appareil photo", Icons.Filled.PhotoCamera, File(base, Environment.DIRECTORY_DCIM).absolutePath),
-        Shortcut("Documents", Icons.Filled.Description, File(base, Environment.DIRECTORY_DOCUMENTS).absolutePath),
-        Shortcut("Images", Icons.Filled.PhotoLibrary, File(base, Environment.DIRECTORY_PICTURES).absolutePath),
-        Shortcut("Musique", Icons.Filled.LibraryMusic, File(base, Environment.DIRECTORY_MUSIC).absolutePath),
-        Shortcut("Films", Icons.Filled.VideoLibrary, File(base, Environment.DIRECTORY_MOVIES).absolutePath),
+        Shortcut("Téléchargements", Icons.Filled.Download, File(base, Environment.DIRECTORY_DOWNLOADS).absolutePath, Color(0xFF3E7BFA)),
+        Shortcut("Appareil photo", Icons.Filled.PhotoCamera, File(base, Environment.DIRECTORY_DCIM).absolutePath, Color(0xFF0E9AA7)),
+        Shortcut("Documents", Icons.Filled.Description, File(base, Environment.DIRECTORY_DOCUMENTS).absolutePath, Color(0xFF6A4FD8)),
+        Shortcut("Images", Icons.Filled.PhotoLibrary, File(base, Environment.DIRECTORY_PICTURES).absolutePath, Color(0xFF2E9E5B)),
+        Shortcut("Musique", Icons.Filled.LibraryMusic, File(base, Environment.DIRECTORY_MUSIC).absolutePath, Color(0xFF8E4EC6)),
+        Shortcut("Films", Icons.Filled.VideoLibrary, File(base, Environment.DIRECTORY_MOVIES).absolutePath, Color(0xFFE5484D)),
     )
 }
 
@@ -130,7 +130,6 @@ class HomeActions(
     val onOpenPath: (String) -> Unit = {},
     val onCategory: (Category) -> Unit = {},
     val onRemoveFavorite: (String) -> Unit = {},
-    val onRecent: (FileItem) -> Unit = {},
     val onVault: () -> Unit = {},
     val onTrash: () -> Unit = {},
 )
@@ -139,7 +138,7 @@ class HomeActions(
 fun HomeScreen(navigator: AppNavigator) {
     val vm: HomeViewModel = viewModel()
     val roots by vm.roots.collectAsStateWithLifecycle()
-    val recent by vm.recent.collectAsStateWithLifecycle()
+    val counts by vm.counts.collectAsStateWithLifecycle()
     val stats by vm.stats.collectAsStateWithLifecycle()
     val settings by FileManagerApp.instance.settingsState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -158,13 +157,6 @@ fun HomeScreen(navigator: AppNavigator) {
                 snackbar.showSnackbar("Retiré des favoris")
             }
         },
-        onRecent = { item ->
-            when {
-                navigator.openInternal(item) -> Unit
-                !FileOpener.openExternal(context, item.file) ->
-                    scope.launch { snackbar.showSnackbar("Aucune application pour ouvrir ce fichier") }
-            }
-        },
         onVault = navigator::vault,
         onTrash = navigator::trash,
     )
@@ -175,7 +167,7 @@ fun HomeScreen(navigator: AppNavigator) {
             stats = stats,
             shortcuts = remember { defaultShortcuts() },
             favorites = settings.favorites,
-            recent = recent,
+            counts = counts,
             actions = actions,
             contentPadding = padding,
         )
@@ -188,7 +180,7 @@ fun HomeContent(
     stats: Map<Category, MediaQueries.Stat>,
     shortcuts: List<Shortcut>,
     favorites: List<String>,
-    recent: List<FileItem>,
+    counts: Map<String, Int>,
     actions: HomeActions,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
@@ -216,28 +208,26 @@ fun HomeContent(
         }
 
         SectionTitle("Accès rapide")
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        val tiles = favorites.map { path ->
+            Shortcut(File(path).name.ifEmpty { path }, Icons.Filled.Star, path, Color(0xFFFFA000)) to true
+        } + shortcuts.map { it to false }
+        Column(
+            Modifier.padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(favorites, key = { "fav:$it" }) { path ->
-                ShortcutChip(
-                    Shortcut(File(path).name.ifEmpty { path }, Icons.Filled.Star, path),
-                    onClick = { actions.onOpenPath(path) },
-                    onLongClick = { actions.onRemoveFavorite(path) },
-                    accent = Color(0xFFFFA000),
-                )
-            }
-            items(shortcuts, key = { it.path }) { s -> ShortcutChip(s, onClick = { actions.onOpenPath(s.path) }) }
-        }
-
-        if (recent.isNotEmpty()) {
-            SectionTitle("Récents", action = "Tout voir") { actions.onCategory(Category.RECENT) }
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(recent, key = { it.path }) { item -> RecentCard(item) { actions.onRecent(item) } }
+            tiles.chunked(3).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    row.forEach { (s, isFavorite) ->
+                        ShortcutTile(
+                            shortcut = s,
+                            count = counts[s.path],
+                            modifier = Modifier.weight(1f),
+                            onClick = { actions.onOpenPath(s.path) },
+                            onLongClick = if (isFavorite) ({ actions.onRemoveFavorite(s.path) }) else null,
+                        )
+                    }
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
             }
         }
     }
@@ -414,48 +404,45 @@ private fun CategoryTile(category: Category, stat: MediaQueries.Stat?, modifier:
 }
 
 @Composable
-private fun ShortcutChip(
+private fun ShortcutTile(
     shortcut: Shortcut,
+    count: Int?,
+    modifier: Modifier,
     onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
-    accent: Color? = null,
+    onLongClick: (() -> Unit)?,
 ) {
-    Row(
-        Modifier
-            .clip(CircleShape)
+    Column(
+        modifier
+            .clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 12.dp, vertical = 12.dp),
     ) {
         Box(
             Modifier
-                .size(30.dp)
-                .background(accent?.copy(alpha = 0.18f) ?: MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                .size(38.dp)
+                .background(shortcut.color.copy(alpha = 0.16f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(shortcut.icon, null, modifier = Modifier.size(17.dp), tint = accent ?: MaterialTheme.colorScheme.onPrimaryContainer)
+            Icon(shortcut.icon, null, tint = shortcut.color, modifier = Modifier.size(21.dp))
         }
-        Text(shortcut.label, modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelLarge, maxLines = 1)
-    }
-}
-
-@Composable
-private fun RecentCard(item: FileItem, onClick: () -> Unit) {
-    Column(
-        Modifier
-            .width(84.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .clickable(onClick = onClick),
-    ) {
-        FileThumbnail(item, Modifier.size(84.dp), iconSize = 32)
         Text(
-            item.name,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium,
+            shortcut.label,
+            style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
+            modifier = Modifier.padding(top = 10.dp),
+        )
+        Text(
+            when (count) {
+                null -> " "
+                0 -> "Vide"
+                1 -> "1 élément"
+                else -> "$count éléments"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
         )
     }
 }

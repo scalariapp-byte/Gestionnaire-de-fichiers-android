@@ -27,8 +27,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     private val _roots = MutableStateFlow<List<StorageRoot>>(emptyList())
     val roots: StateFlow<List<StorageRoot>> = _roots.asStateFlow()
 
-    private val _recent = MutableStateFlow<List<FileItem>>(emptyList())
-    val recent: StateFlow<List<FileItem>> = _recent.asStateFlow()
+    /** Nombre d'éléments de chaque dossier d'accès rapide (chemin → nombre). */
+    private val _counts = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val counts: StateFlow<Map<String, Int>> = _counts.asStateFlow()
 
     private val _stats = MutableStateFlow<Map<Category, MediaQueries.Stat>>(emptyMap())
     val stats: StateFlow<Map<Category, MediaQueries.Stat>> = _stats.asStateFlow()
@@ -44,7 +45,12 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             val ctx = getApplication<Application>()
             _roots.value = withContext(Dispatchers.IO) { StorageRoots.list(ctx) }
             val showHidden = FileManagerApp.instance.settingsState.value.showHidden
-            _recent.value = MediaQueries.query(ctx, Category.RECENT, showHidden, limit = 30)
+            val paths = defaultShortcuts().map { it.path } + FileManagerApp.instance.settingsState.value.favorites
+            _counts.value = withContext(Dispatchers.IO) {
+                paths.associateWith { p ->
+                    java.io.File(p).list()?.count { showHidden || !it.startsWith(".") } ?: 0
+                }
+            }
             if (withStats || _stats.value.isEmpty()) {
                 val stats = HashMap<Category, MediaQueries.Stat>()
                 for (c in HOME_CATEGORIES) stats[c] = MediaQueries.stat(ctx, c, showHidden)
