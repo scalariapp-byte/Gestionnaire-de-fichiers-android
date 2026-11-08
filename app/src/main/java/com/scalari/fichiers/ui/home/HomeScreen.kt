@@ -265,7 +265,7 @@ private fun StorageCompact(root: StorageRoot, others: List<StorageRoot>, onOpen:
             .fillMaxWidth()
             .padding(horizontal = 20.dp, vertical = 8.dp)
             .clip(MaterialTheme.shapes.large)
-            .background(Brush.linearGradient(listOf(Color(0xFF7B61FF), Color(0xFF1FA2E0)))),
+            .background(Brush.linearGradient(listOf(Color(0xFF6A4CFF), Color(0xFF1FA8DC)))),
     ) {
         Row(
             Modifier
