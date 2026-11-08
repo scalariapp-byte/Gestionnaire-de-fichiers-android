@@ -137,6 +137,7 @@ class HomeActions(
     val onAnalyzeRoot: (String) -> Unit = {},
     val onInstallUpdate: (com.scalari.fichiers.update.Release) -> Unit = {},
     val onDismissUpdate: () -> Unit = {},
+    val onOpenUpdatePage: (com.scalari.fichiers.update.Release?) -> Unit = {},
 )
 
 @Composable
@@ -150,7 +151,10 @@ fun HomeScreen(navigator: AppNavigator) {
     val context = LocalContext.current
     val snackbar = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refresh() }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        vm.refresh()
+        scope.launch { com.scalari.fichiers.update.UpdateManager.check(context) }
+    }
 
     val actions = HomeActions(
         onSearch = { navigator.browser(null, search = true) },
@@ -169,6 +173,7 @@ fun HomeScreen(navigator: AppNavigator) {
         onAnalyzeRoot = { navigator.analyzer(it) },
         onInstallUpdate = { r -> scope.launch { com.scalari.fichiers.update.UpdateManager.downloadAndInstall(context, r) } },
         onDismissUpdate = { com.scalari.fichiers.update.UpdateManager.dismiss(context) },
+        onOpenUpdatePage = { com.scalari.fichiers.update.UpdateManager.openReleasePage(context, it) },
     )
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
@@ -520,8 +525,13 @@ private fun UpdateBanner(state: com.scalari.fichiers.update.UpdateState, actions
                     )
                 }
                 if (progress == null) {
-                    androidx.compose.material3.TextButton(onClick = actions.onDismissUpdate) { Text("Plus tard") }
-                    androidx.compose.material3.Button(onClick = { actions.onInstallUpdate(release) }) { Text("Installer") }
+                    if (error != null) {
+                        androidx.compose.material3.TextButton(onClick = { actions.onOpenUpdatePage(release) }) { Text("GitHub") }
+                        androidx.compose.material3.Button(onClick = { actions.onInstallUpdate(release) }) { Text("Réessayer") }
+                    } else {
+                        androidx.compose.material3.TextButton(onClick = actions.onDismissUpdate) { Text("Plus tard") }
+                        androidx.compose.material3.Button(onClick = { actions.onInstallUpdate(release) }) { Text("Installer") }
+                    }
                 }
             }
             if (progress != null) {

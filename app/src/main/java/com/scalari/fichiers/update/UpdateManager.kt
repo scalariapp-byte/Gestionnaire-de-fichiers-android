@@ -92,8 +92,12 @@ object UpdateManager {
         return false
     }
 
-    /** Dernière version publiée, ou null en cas d'échec réseau. */
+    /** Raison du dernier échec de vérification (affichée à l'utilisateur). */
+    @Volatile private var lastError: String? = null
+
+    /** Dernière version publiée, ou null en cas d'échec (raison dans [lastError]). */
     suspend fun fetchLatest(): Release? = withContext(Dispatchers.IO) {
+        lastError = null
         runCatching {
             val conn = URL("https://api.github.com/repos/$REPO/releases/latest").openConnection() as HttpURLConnection
             conn.setRequestProperty("Accept", "application/vnd.github+json")
@@ -101,7 +105,10 @@ object UpdateManager {
             conn.connectTimeout = 10_000
             conn.readTimeout = 15_000
             try {
-                if (conn.responseCode != 200) return@runCatching null
+                if (conn.responseCode != 200) {
+                    lastError = "GitHub a répondu ${conn.responseCode}" + if (conn.responseCode == 403) " (trop de requêtes, réessayez plus tard)" else ""
+                    return@runCatching null
+                }
                 val json = JSONObject(conn.inputStream.bufferedReader().readText())
                 val assets = json.getJSONArray("assets")
                 var apkUrl = ""
@@ -114,22 +121,28 @@ object UpdateManager {
                         size = a.optLong("size")
                     }
                 }
-                if (apkUrl.isEmpty()) return@runCatching null
+                if (apkUrl.isEmpty()) {
+                    lastError = "Aucun APK dans la dernière release"
+                    return@runCatching null
+                }
                 Release(json.getString("tag_name"), apkUrl, size, json.optString("html_url"), json.optString("body"))
             } finally {
                 conn.disconnect()
             }
-        }.getOrNull()
+        }.getOrElse { e ->
+            lastError = "Connexion impossible : ${e.javaClass.simpleName}${e.message?.let { " – $it" } ?: ""}"
+            null
+        }
     }
 
     /**
      * Vérifie s'il y a une mise à jour. [force] ignore le délai minimal entre deux vérifications
-     * (6 h) ; [manual] signale « à jour » ou les erreurs, sinon la vérification reste discrète.
+     * (30 min) ; [manual] signale « à jour » ou les erreurs, sinon la vérification reste discrète.
      */
     suspend fun check(c: Context, force: Boolean = false, manual: Boolean = false) {
         val p = prefs(c)
         val now = System.currentTimeMillis()
-        if (!force && now - p.getLong("last_check", 0) < 6 * 3600_000L) {
+        if (!force && now - p.getLong("last_check", 0) < 30 * 60_000L) {
             p.getString("available", null)?.let { cached ->
                 restore(cached)?.takeIf { isNewer(it.version) }?.let { _state.value = UpdateState.Available(it) }
             }
@@ -138,7 +151,7 @@ object UpdateManager {
         if (manual) _state.value = UpdateState.Checking
         val latest = fetchLatest()
         if (latest == null) {
-            if (manual) _state.value = UpdateState.Error("Impossible de joindre GitHub. Vérifiez la connexion.")
+            if (manual) _state.value = UpdateState.Error(lastError ?: "Impossible de joindre GitHub. Vérifiez la connexion.")
             return
         }
         p.edit().putLong("last_check", now).apply()
@@ -149,6 +162,12 @@ object UpdateManager {
             p.edit().remove("available").apply()
             _state.value = if (manual) UpdateState.UpToDate else UpdateState.Idle
         }
+    }
+
+    /** Solution de secours : ouvre la page de la release dans le navigateur. */
+    fun openReleasePage(c: Context, release: Release?) {
+        val url = release?.pageUrl?.takeIf { it.isNotBlank() } ?: "https://github.com/$REPO/releases/latest"
+        runCatching { c.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
     fun dismiss(c: Context) {
@@ -208,12 +227,15 @@ object UpdateManager {
                         }
                     }
                 }
+                if (conn.responseCode !in 200..299) error("le serveur a répondu ${conn.responseCode}")
                 conn.disconnect()
                 out
+            }.onFailure { e ->
+                lastError = "Échec du téléchargement : ${e.javaClass.simpleName}${e.message?.let { " – $it" } ?: ""}"
             }.getOrNull()
         }
         if (file == null || file.length() == 0L) {
-            _state.value = UpdateState.Error("Échec du téléchargement.", release)
+            _state.value = UpdateState.Error(lastError ?: "Échec du téléchargement.", release)
             return
         }
         _state.value = UpdateState.Available(release)
@@ -221,7 +243,7 @@ object UpdateManager {
             .setDataAndType(FileOpener.uriFor(ctx, file), "application/vnd.android.package-archive")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { ctx.startActivity(intent) }
-            .onFailure { _state.value = UpdateState.Error("Impossible de lancer l'installation.", release) }
+            .onFailure { e -> _state.value = UpdateState.Error("Impossible de lancer l'installation : ${e.message ?: e.javaClass.simpleName}", release) }
     }
 
     /** Notification de nouvelle version, une seule fois par version. */
