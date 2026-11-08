@@ -3,6 +3,12 @@
 package com.scalari.fichiers.ui.analyzer
 
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.FilledTonalButton
+import androidx.core.content.ContextCompat
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.Image
@@ -68,6 +74,36 @@ fun BootAppsScreen(onBack: () -> Unit) {
     var showSystem by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf<BootApp?>(null) }
 
+    // Liaison avec Isolateur : blocage réel du démarrage (récepteurs désactivés via Shizuku).
+    val isoInstalled = remember {
+        runCatching { context.packageManager.getPackageInfo(ISO_PKG, 0); true }.getOrDefault(false)
+    }
+    var pending by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
+    val controlLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val msg = if (r.resultCode == android.app.Activity.RESULT_OK) "C'est fait" else when (r.data?.getStringExtra("error")) {
+            "shizuku" -> "Ouvre Isolateur et démarre Shizuku"
+            "critical" -> "Appli indispensable au téléphone : refusé"
+            else -> "Échec"
+        }
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+        refresh++
+    }
+    fun send(pkg: String, block: Boolean) = runCatching {
+        controlLauncher.launch(
+            Intent(ISO_ACTION).setPackage(ISO_PKG).putExtra("pkg", pkg).putExtra("blocked", block)
+        )
+    }.onFailure { Toast.makeText(context, "Mets Isolateur à jour", Toast.LENGTH_SHORT).show() }
+    val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val p = pending
+        pending = null
+        if (granted && p != null) send(p.first, p.second)
+        else if (!granted) Toast.makeText(context, "Autorisation refusée", Toast.LENGTH_SHORT).show()
+    }
+    fun requestBoot(pkg: String, block: Boolean) {
+        if (ContextCompat.checkSelfPermission(context, ISO_PERM) == PackageManager.PERMISSION_GRANTED) send(pkg, block)
+        else { pending = pkg to block; permLauncher.launch(ISO_PERM) }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -113,7 +149,13 @@ fun BootAppsScreen(onBack: () -> Unit) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Cette application demande à se lancer à chaque démarrage du téléphone.")
-                    Text(
+                    if (isoInstalled) {
+                        FilledTonalButton(
+                            onClick = { selected = null; requestBoot(app.packageName, !app.isBlocked) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(if (app.isBlocked) "Autoriser au démarrage" else "Bloquer le démarrage") }
+                    }
+                    if (!isoInstalled) Text(
                         "Android ne permet pas à une autre appli de la désactiver. Dans sa page d'infos, vous pouvez :\n" +
                             "• Forcer l'arrêt : elle ne se relancera plus au démarrage tant que vous ne l'ouvrirez pas vous-même.\n" +
                             "• Batterie → Restreinte : limite son activité en arrière-plan.\n" +
@@ -156,6 +198,10 @@ fun BootAppsScreen(onBack: () -> Unit) {
         )
     }
 }
+
+private const val ISO_PKG = "com.isolapp.manager"
+private const val ISO_ACTION = "com.isolapp.manager.action.SET_BOOT"
+private const val ISO_PERM = "com.isolapp.manager.permission.CONTROL"
 
 /** Liste sans état (testable en capture). */
 @Composable
@@ -225,6 +271,7 @@ fun BootAppsContent(
                 }
                 val (status, color) = when {
                     app.isDisabled -> "Désactivée" to MaterialTheme.colorScheme.outline
+                    app.isBlocked -> "Bloquée" to Color(0xFF2E9E5B)
                     app.isStopped -> "Arrêtée" to Color(0xFF2E9E5B)
                     else -> "Au démarrage" to Color(0xFFF07A1A)
                 }
