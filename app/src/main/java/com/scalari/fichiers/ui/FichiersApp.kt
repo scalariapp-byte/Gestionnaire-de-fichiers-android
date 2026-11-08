@@ -1,6 +1,11 @@
 package com.scalari.fichiers.ui
 
 import android.net.Uri
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -31,6 +36,8 @@ import com.scalari.fichiers.ui.home.HomeScreen
 import com.scalari.fichiers.ui.permission.PermissionScreen
 import com.scalari.fichiers.ui.settings.SettingsScreen
 import com.scalari.fichiers.ui.trash.TrashScreen
+import com.scalari.fichiers.ui.vault.VaultScreen
+import com.scalari.fichiers.data.vault.VaultManager
 import com.scalari.fichiers.ui.viewer.ImageViewerScreen
 import com.scalari.fichiers.ui.viewer.TextEditorScreen
 
@@ -41,7 +48,8 @@ object Routes {
     const val BROWSER = "browser?path={path}&search={search}"
     const val CATEGORY = "category/{name}"
     const val TEXT = "text?path={path}"
-    const val IMAGE = "image?path={path}"
+    const val IMAGE = "image?path={path}&secure={secure}"
+    const val VAULT = "vault"
     const val TRASH = "trash"
     const val SETTINGS = "settings"
 
@@ -50,7 +58,7 @@ object Routes {
 
     fun category(c: Category) = "category/${c.name}"
     fun text(path: String) = "text?path=${Uri.encode(path)}"
-    fun image(path: String) = "image?path=${Uri.encode(path)}"
+    fun image(path: String, secure: Boolean = false) = "image?path=${Uri.encode(path)}&secure=$secure"
 }
 
 /** Actions de navigation partagées par les écrans. */
@@ -59,7 +67,8 @@ class AppNavigator(private val nav: NavHostController) {
     fun browser(path: String?, search: Boolean = false) = nav.navigate(Routes.browser(path, search))
     fun category(c: Category) = nav.navigate(Routes.category(c))
     fun text(path: String) = nav.navigate(Routes.text(path))
-    fun image(path: String) = nav.navigate(Routes.image(path))
+    fun image(path: String, secure: Boolean = false) = nav.navigate(Routes.image(path, secure))
+    fun vault() = nav.navigate(Routes.VAULT) { launchSingleTop = true }
     fun trash() = nav.navigate(Routes.TRASH)
     fun settings() = nav.navigate(Routes.SETTINGS)
 }
@@ -69,6 +78,9 @@ fun FichiersApp() {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(StoragePermission.isGranted(context)) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { granted = StoragePermission.isGranted(context) }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        if (VaultManager.externalOpen) VaultManager.externalOpen = false else VaultManager.lock(context)
+    }
 
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(Unit) {
@@ -98,7 +110,14 @@ private fun AppNavHost() {
         defaultValue = null
     }
 
-    NavHost(navController = nav, startDestination = Routes.HOME) {
+    NavHost(
+        navController = nav,
+        startDestination = Routes.HOME,
+        enterTransition = { fadeIn(tween(220)) + slideInHorizontally(tween(260)) { it / 12 } },
+        exitTransition = { fadeOut(tween(180)) },
+        popEnterTransition = { fadeIn(tween(220)) },
+        popExitTransition = { fadeOut(tween(180)) + slideOutHorizontally(tween(240)) { it / 12 } },
+    ) {
         composable(Routes.HOME) {
             HomeScreen(navigator)
         }
@@ -126,8 +145,18 @@ private fun AppNavHost() {
         composable(Routes.TEXT, arguments = listOf(pathArg)) { entry ->
             TextEditorScreen(entry.arguments?.getString("path") ?: "", onBack = navigator::back)
         }
-        composable(Routes.IMAGE, arguments = listOf(pathArg)) { entry ->
-            ImageViewerScreen(entry.arguments?.getString("path") ?: "", onBack = navigator::back)
+        composable(
+            Routes.IMAGE,
+            arguments = listOf(pathArg, navArgument("secure") { type = NavType.BoolType; defaultValue = false }),
+        ) { entry ->
+            ImageViewerScreen(
+                path = entry.arguments?.getString("path") ?: "",
+                secure = entry.arguments?.getBoolean("secure") ?: false,
+                onBack = navigator::back,
+            )
+        }
+        composable(Routes.VAULT) {
+            VaultScreen(navigator)
         }
         composable(Routes.TRASH) {
             TrashScreen(onBack = navigator::back)

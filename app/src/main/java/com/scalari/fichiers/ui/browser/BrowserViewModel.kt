@@ -85,7 +85,9 @@ class BrowserViewModel(app: Application, startPath: String?, openSearch: Boolean
         if (userRefresh) _state.update { it.copy(refreshing = true) }
         loadJob = viewModelScope.launch {
             val s = settings.value
-            val items = withContext(Dispatchers.IO) { FileOps.list(dir, s) }
+            // Le tri par taille a besoin du nombre d'éléments des dossiers dès le départ.
+            val needCounts = s.sortBy == com.scalari.fichiers.data.SortBy.SIZE
+            val items = withContext(Dispatchers.IO) { FileOps.list(dir, s, countChildren = needCounts) }
             val readable = dir.canRead()
             _state.update { st ->
                 val paths = items.mapTo(HashSet()) { it.path }
@@ -99,6 +101,10 @@ class BrowserViewModel(app: Application, startPath: String?, openSearch: Boolean
                 )
             }
             if (_state.value.searchActive && _state.value.searchQuery.isNotBlank()) startSearch(_state.value.searchQuery, 0)
+            if (!needCounts && items.any { it.isDirectory }) {
+                val counted = withContext(Dispatchers.IO) { FileOps.withChildCounts(items) }
+                _state.update { st -> if (st.currentDir == dir && st.items === items) st.copy(items = counted) else st }
+            }
         }
     }
 

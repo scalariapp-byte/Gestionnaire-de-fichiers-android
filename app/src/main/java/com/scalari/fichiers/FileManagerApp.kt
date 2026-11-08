@@ -6,6 +6,7 @@ import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
 import com.scalari.fichiers.data.AppSettings
 import com.scalari.fichiers.data.SettingsRepository
+import com.scalari.fichiers.data.vault.VaultManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,12 +28,13 @@ class FileManagerApp : Application(), ImageLoaderFactory {
         instance = this
         settings = SettingsRepository(this)
         settingsState = settings.settings.stateIn(appScope, SharingStarted.Eagerly, AppSettings())
+        VaultManager.clearTemp(this)
     }
 
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
             .components { add(VideoFrameDecoder.Factory()) }
-            .crossfade(true)
+            .crossfade(120)
             .build()
 
     companion object {

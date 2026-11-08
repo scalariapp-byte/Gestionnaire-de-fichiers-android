@@ -1,5 +1,6 @@
 package com.scalari.fichiers.data
 
+import com.scalari.fichiers.data.vault.VaultManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -14,14 +15,22 @@ object FileOps {
 
     private const val MAX_SEARCH_RESULTS = 2000
 
-    fun list(dir: File, settings: AppSettings): List<FileItem> {
+    /**
+     * Liste un dossier. Sans [countChildren], le nombre d'éléments des sous-dossiers n'est pas
+     * calculé (un appel système de moins par dossier) : l'affichage est quasi immédiat et
+     * [withChildCounts] complète ensuite.
+     */
+    fun list(dir: File, settings: AppSettings, countChildren: Boolean = true): List<FileItem> {
         val files = dir.listFiles() ?: return emptyList()
         val items = files.asSequence()
-            .filter { settings.showHidden || !it.name.startsWith(".") }
-            .map { it.toFileItem() }
+            .filter { (settings.showHidden || !it.name.startsWith(".")) && it.name != VaultManager.DIR_NAME }
+            .map { it.toFileItem(countChildren) }
             .toList()
         return sort(items, settings.sortBy, settings.ascending, settings.foldersFirst)
     }
+
+    fun withChildCounts(items: List<FileItem>): List<FileItem> =
+        items.map { if (it.isDirectory && it.childCount < 0) it.copy(childCount = it.file.list()?.size ?: 0) else it }
 
     fun sort(items: List<FileItem>, sortBy: SortBy, ascending: Boolean, foldersFirst: Boolean): List<FileItem> {
         val byName: Comparator<FileItem> = compareBy<FileItem, String>(NaturalOrder) { it.name }
@@ -48,11 +57,12 @@ object FileOps {
         }
         val results = ArrayList<FileItem>()
         var lastEmit = 0L
-        val walker = root.walkTopDown().onEnter { it == root || showHidden || !it.name.startsWith(".") }
+        val walker = root.walkTopDown().onEnter { it == root || ((showHidden || !it.name.startsWith(".")) && it.name != VaultManager.DIR_NAME) }
         for (f in walker) {
             currentCoroutineContext().ensureActive()
             if (f == root) continue
             if (!showHidden && f.name.startsWith(".")) continue
+            if (f.name == VaultManager.DIR_NAME) continue
             if (f.name.lowercase(Locale.ROOT).contains(q)) {
                 results += f.toFileItem()
                 if (results.size >= MAX_SEARCH_RESULTS) break

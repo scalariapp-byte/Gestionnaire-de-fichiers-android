@@ -3,6 +3,8 @@ package com.scalari.fichiers.data
 import android.media.MediaScannerConnection
 import android.os.SystemClock
 import com.scalari.fichiers.FileManagerApp
+import com.scalari.fichiers.data.vault.VaultEntry
+import com.scalari.fichiers.data.vault.VaultManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -332,5 +334,58 @@ object OperationManager {
             throw e
         }
         "Extrait dans « ${dest.name} »"
+    }
+
+    // ---------------------------------------------------------------- Coffre-fort
+
+    fun vaultAdd(files: List<File>) = run("Chiffrement") { touched ->
+        val list = ArrayList<Pair<File, String>>()
+        for (f in files) {
+            if (f.isDirectory) {
+                val base = f.parentFile ?: f
+                f.walkTopDown().filter { it.isFile }.forEach { list += it to it.relativeTo(base).path }
+            } else if (f.isFile) {
+                list += f to f.name
+            }
+        }
+        val t = Tracker("Chiffrement", list.sumOf { it.first.length() }, list.size)
+        list.forEachIndexed { i, (f, name) ->
+            currentCoroutineContext().ensureActive()
+            t.update(name, force = true)
+            if (touched.size < MAX_SCAN) touched += f.absolutePath
+            VaultManager.addFile(f, name) { n ->
+                t.bytes += n
+                t.update(name)
+            }
+            t.items = i + 1
+        }
+        // Supprime les dossiers devenus vides.
+        files.filter { it.isDirectory }.forEach { dir ->
+            dir.walkBottomUp().filter { it.isDirectory && it.list()?.isEmpty() == true }.forEach { it.delete() }
+        }
+        "${plural(list.size, "fichier")} chiffré${if (list.size > 1) "s" else ""} dans le coffre-fort"
+    }
+
+    fun vaultRestore(entries: List<VaultEntry>) = run("Restauration") { touched ->
+        val t = Tracker("Restauration", entries.sumOf { it.size }, entries.size)
+        entries.forEachIndexed { i, e ->
+            currentCoroutineContext().ensureActive()
+            t.update(e.fileName, force = true)
+            val target = VaultManager.restore(e) { n ->
+                t.bytes += n
+                t.update(e.fileName)
+            }
+            touched += target.absolutePath
+            t.items = i + 1
+        }
+        "${plural(entries.size, "fichier")} restauré${if (entries.size > 1) "s" else ""}"
+    }
+
+    fun vaultDelete(entries: List<VaultEntry>) = run("Suppression") { _ ->
+        entries.forEach {
+            currentCoroutineContext().ensureActive()
+            VaultManager.remove(it)
+        }
+        "${plural(entries.size, "fichier")} supprimé${if (entries.size > 1) "s" else ""} du coffre"
     }
 }

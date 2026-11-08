@@ -3,4 +3,6 @@
     <external-path name="external" path="." />
     <!-- Nécessaire pour les cartes SD et clés USB (hors stockage principal). -->
     <root-path name="root" path="." />
+    <!-- Copies déchiffrées temporaires du coffre-fort. -->
+    <cache-path name="cache" path="." />
 </paths>

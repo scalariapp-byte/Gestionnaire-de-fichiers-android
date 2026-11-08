@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
@@ -226,6 +227,14 @@ fun HomeScreen(navigator: AppNavigator) {
             }
 
             item { SectionTitle("Outils") }
+            item {
+                ListItem(
+                    modifier = Modifier.clickable(onClick = navigator::vault),
+                    leadingContent = { Icon(Icons.Filled.Lock, null, tint = MaterialTheme.colorScheme.primary) },
+                    headlineContent = { Text("Coffre-fort") },
+                    supportingContent = { Text("Fichiers chiffrés et cachés, protégés par code") },
+                )
+            }
             item {
                 ListItem(
                     modifier = Modifier.clickable(onClick = navigator::trash),

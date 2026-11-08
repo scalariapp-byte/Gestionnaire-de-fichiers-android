@@ -1,0 +1,5 @@
+# Profil de démarrage : précompile (AOT) tout le code de l'application à l'installation,
+# ce qui supprime les saccades dues à l'interprétation/JIT au premier lancement et au défilement.
+# Les bibliothèques Compose embarquent déjà leur propre profil.
+HSPLcom/scalari/fichiers/**;->**(**)**
+Lcom/scalari/fichiers/**;

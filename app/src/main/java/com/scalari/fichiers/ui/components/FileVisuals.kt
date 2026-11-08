@@ -123,7 +123,8 @@ fun FileThumbnail(item: FileItem, modifier: Modifier = Modifier, iconSize: Int =
 }
 
 fun FileItem.subtitle(): String =
-    if (isDirectory) "${childCount} élément${if (childCount > 1) "s" else ""} · ${formatDate(lastModified)}"
+    if (isDirectory && childCount < 0) formatDate(lastModified)
+    else if (isDirectory) "${childCount} élément${if (childCount > 1) "s" else ""} · ${formatDate(lastModified)}"
     else "${formatSize(size)} · ${formatDate(lastModified)}"
 
 @Composable
@@ -132,11 +133,12 @@ fun FileRow(
     selected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
     supporting: String = item.subtitle(),
 ) {
     val bg = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
     ListItem(
-        modifier = Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
         colors = ListItemDefaults.colors(containerColor = bg),
         leadingContent = {
             Box(contentAlignment = Alignment.Center) {
@@ -174,9 +176,10 @@ fun FileGridItem(
     selected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier
+        modifier = modifier
             .padding(4.dp)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         colors = CardDefaults.cardColors(

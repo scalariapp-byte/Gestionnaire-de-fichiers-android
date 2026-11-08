@@ -1,6 +1,7 @@
 package com.scalari.fichiers.data
 
 import android.webkit.MimeTypeMap
+import androidx.compose.runtime.Immutable
 import java.io.File
 import java.text.DateFormat
 import java.util.Date
@@ -10,6 +11,7 @@ enum class FileType {
     FOLDER, IMAGE, VIDEO, AUDIO, PDF, DOCUMENT, SPREADSHEET, PRESENTATION, TEXT, CODE, ARCHIVE, APK, OTHER
 }
 
+@Immutable
 data class FileItem(
     val file: File,
     val name: String,
@@ -17,7 +19,7 @@ data class FileItem(
     val size: Long,
     val lastModified: Long,
     val isHidden: Boolean,
-    /** Nombre d'enfants pour un dossier, -1 pour un fichier. */
+    /** Nombre d'enfants pour un dossier (-2 = pas encore calculé), -1 pour un fichier. */
     val childCount: Int,
     val type: FileType,
 ) {
@@ -25,7 +27,7 @@ data class FileItem(
     val extension: String get() = file.extension.lowercase(Locale.ROOT)
 }
 
-fun File.toFileItem(): FileItem {
+fun File.toFileItem(countChildren: Boolean = true): FileItem {
     val dir = isDirectory
     return FileItem(
         file = this,
@@ -34,7 +36,7 @@ fun File.toFileItem(): FileItem {
         size = if (dir) 0L else length(),
         lastModified = lastModified(),
         isHidden = name.startsWith("."),
-        childCount = if (dir) (list()?.size ?: 0) else -1,
+        childCount = if (!dir) -1 else if (countChildren) (list()?.size ?: 0) else -2,
         type = FileTypes.of(name, dir),
     )
 }

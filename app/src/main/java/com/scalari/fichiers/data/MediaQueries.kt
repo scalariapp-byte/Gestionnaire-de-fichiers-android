@@ -2,6 +2,7 @@ package com.scalari.fichiers.data
 
 import android.content.Context
 import android.provider.MediaStore
+import com.scalari.fichiers.data.vault.VaultManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -62,7 +63,7 @@ object MediaQueries {
                 val iDate = c.getColumnIndexOrThrow(date)
                 while (c.moveToNext() && out.size < max) {
                     val path = c.getString(iData) ?: continue
-                    if (path.contains("/${TrashManager.TRASH_DIR}/")) continue
+                    if (path.contains("/${TrashManager.TRASH_DIR}/") || path.contains("/${VaultManager.DIR_NAME}/")) continue
                     val hidden = path.contains("/.")
                     if (hidden && !showHidden) continue
                     val f = File(path)

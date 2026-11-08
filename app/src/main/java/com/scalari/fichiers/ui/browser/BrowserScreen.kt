@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.NoteAdd
 import androidx.compose.material.icons.filled.OpenInNew
@@ -106,6 +107,9 @@ import com.scalari.fichiers.data.FileItem
 import com.scalari.fichiers.data.FileOps
 import com.scalari.fichiers.data.FileType
 import com.scalari.fichiers.data.FileTypes
+import com.scalari.fichiers.data.OperationManager
+import com.scalari.fichiers.data.vault.VaultManager
+import com.scalari.fichiers.data.vault.VaultState
 import com.scalari.fichiers.ui.AppNavigator
 import com.scalari.fichiers.ui.FileOpener
 import com.scalari.fichiers.ui.LocalSnackbarHostState
@@ -127,6 +131,7 @@ private sealed interface BrowserDialog {
     data class Properties(val files: List<File>) : BrowserDialog
     data class Compress(val files: List<File>) : BrowserDialog
     data class Archive(val item: FileItem) : BrowserDialog
+    data class Vault(val files: List<File>) : BrowserDialog
 }
 
 @Suppress("DEPRECATION")
@@ -213,6 +218,7 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                         if (!FileOpener.openExternal(context, item.file, forceChooser = true, mime = "*/*")) message("Aucune application disponible")
                     },
                     onToggleFavorite = { item -> vm.toggleFavorite(item.path); vm.clearSelection() },
+                    onVault = { dialog = BrowserDialog.Vault(vm.selectedFiles()) },
                 )
 
                 state.searchActive -> SearchTopBar(
@@ -326,8 +332,9 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                         contentPadding = PaddingValues(8.dp, 8.dp, 8.dp, 88.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        items(visible, key = { it.path }) { item ->
+                        items(visible, key = { it.path }, contentType = { if (it.isDirectory) 0 else 1 }) { item ->
                             FileGridItem(
+                                modifier = Modifier.animateItem(),
                                 item = item,
                                 selected = item.path in state.selected,
                                 onClick = { onItemClick(item) },
@@ -341,9 +348,10 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                         contentPadding = PaddingValues(bottom = 88.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        items(visible, key = { it.path }) { item ->
+                        items(visible, key = { it.path }, contentType = { if (it.isDirectory) 0 else 1 }) { item ->
                             if (showParentInSubtitle) {
                                 FileRow(
+                                    modifier = Modifier.animateItem(),
                                     item = item,
                                     selected = item.path in state.selected,
                                     onClick = { onItemClick(item) },
@@ -352,6 +360,7 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                                 )
                             } else {
                                 FileRow(
+                                    modifier = Modifier.animateItem(),
                                     item = item,
                                     selected = item.path in state.selected,
                                     onClick = { onItemClick(item) },
@@ -422,6 +431,23 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
             onConfirm = { dialog = null; vm.compress(d.files, it) },
         )
 
+        is BrowserDialog.Vault -> ConfirmDialog(
+            title = "Mettre au coffre-fort ?",
+            text = (d.files.singleOrNull()?.name?.let { "« $it »" } ?: "${d.files.size} éléments") +
+                " sera chiffré puis retiré de cet emplacement. Il ne sera visible que dans le coffre, après saisie du code.",
+            confirmLabel = "Chiffrer",
+            onDismiss = { dialog = null },
+            onConfirm = {
+                dialog = null
+                vm.clearSelection()
+                if (VaultManager.state.value is VaultState.Unlocked) OperationManager.vaultAdd(d.files)
+                else {
+                    VaultManager.setPending(d.files)
+                    navigator.vault()
+                }
+            },
+        )
+
         is BrowserDialog.Archive -> AlertDialog(
             onDismissRequest = { dialog = null },
             icon = { Icon(Icons.Filled.Archive, null) },
@@ -462,6 +488,7 @@ private fun SelectionTopBar(
     onSelectAll: () -> Unit,
     onOpenWith: (FileItem) -> Unit,
     onToggleFavorite: (FileItem) -> Unit,
+    onVault: () -> Unit,
 ) {
     TopAppBar(
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
@@ -487,6 +514,7 @@ private fun SelectionTopBar(
                         ) { menu = false; onToggleFavorite(single) }
                     }
                 }
+                MenuItem("Mettre au coffre-fort", Icons.Filled.Lock) { menu = false; onVault() }
                 MenuItem("Compresser (ZIP)", Icons.Filled.Archive) { menu = false; onCompress() }
                 if (single?.extension == "zip") {
                     MenuItem("Ouvrir l'archive", Icons.Filled.Unarchive) { menu = false; onOpenWith(single) }

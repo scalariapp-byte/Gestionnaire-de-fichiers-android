@@ -56,20 +56,22 @@ import com.scalari.fichiers.data.OperationManager
 import com.scalari.fichiers.ui.FileOpener
 import com.scalari.fichiers.ui.components.ConfirmDialog
 import com.scalari.fichiers.ui.components.PropertiesDialog
+import com.scalari.fichiers.ui.vault.SecureWindow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
 @Suppress("DEPRECATION")
 @Composable
-fun ImageViewerScreen(path: String, onBack: () -> Unit) {
+fun ImageViewerScreen(path: String, secure: Boolean = false, onBack: () -> Unit) {
+    if (secure) SecureWindow()
     val settings by FileManagerApp.instance.settingsState.collectAsStateWithLifecycle()
     var images by remember { mutableStateOf<List<File>?>(null) }
     var startIndex by remember { mutableStateOf(0) }
 
     LaunchedEffect(path) {
         val start = File(path)
-        val siblings = withContext(Dispatchers.IO) {
+        val siblings = if (secure) listOf(start) else withContext(Dispatchers.IO) {
             start.parentFile?.listFiles()
                 ?.filter { it.isFile && FileTypes.of(it.name, false) == FileType.IMAGE && (settings.showHidden || !it.name.startsWith(".")) }
                 ?.sortedWith(compareBy<File, String>(com.scalari.fichiers.data.NaturalOrder) { it.name })
@@ -95,6 +97,7 @@ fun ImageViewerScreen(path: String, onBack: () -> Unit) {
             startIndex = startIndex,
             confirmBeforeDelete = settings.confirmDelete,
             useTrash = settings.useTrash,
+            secure = secure,
             onBack = onBack,
             onRemoved = { removed -> images = list - removed },
         )
@@ -108,6 +111,7 @@ private fun ImagePager(
     startIndex: Int,
     confirmBeforeDelete: Boolean,
     useTrash: Boolean,
+    secure: Boolean,
     onBack: () -> Unit,
     onRemoved: (File) -> Unit,
 ) {
@@ -154,6 +158,7 @@ private fun ImagePager(
                     }
                 },
                 actions = {
+                    if (!secure) {
                     IconButton(onClick = { FileOpener.share(context, listOf(current)) }) { Icon(Icons.Filled.Share, "Partager") }
                     IconButton(onClick = { FileOpener.openExternal(context, current, forceChooser = true) }) {
                         Icon(Icons.Filled.OpenInNew, "Ouvrir avec")
@@ -166,6 +171,7 @@ private fun ImagePager(
                             onRemoved(current)
                         }
                     }) { Icon(Icons.Filled.Delete, "Supprimer") }
+                    }
                 },
             )
         }

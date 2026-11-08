@@ -233,15 +233,16 @@ fun CategoryScreen(category: Category, navigator: AppNavigator) {
                     contentPadding = PaddingValues(8.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    items(state.items, key = { it.path }) { item ->
-                        FileGridItem(item, item.path in state.selected, onClick = { click(item) }, onLongClick = { vm.toggle(item) })
+                    items(state.items, key = { it.path }, contentType = { it.type }) { item ->
+                        FileGridItem(item, item.path in state.selected, modifier = Modifier.animateItem(), onClick = { click(item) }, onLongClick = { vm.toggle(item) })
                     }
                 }
 
                 else -> LazyColumn(Modifier.fillMaxSize()) {
-                    items(state.items, key = { it.path }) { item ->
+                    items(state.items, key = { it.path }, contentType = { it.type }) { item ->
                         FileRow(
                             item, item.path in state.selected,
+                            modifier = Modifier.animateItem(),
                             onClick = { click(item) },
                             onLongClick = { vm.toggle(item) },
                             supporting = "${formatSize(item.size)} · ${item.file.parentFile?.name ?: ""}",
