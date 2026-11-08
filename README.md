@@ -1,4 +1,4 @@
-# Fichiers — gestionnaire de fichiers Android
+# Gestionnaire de fichiers — Android
 
 Application Android native (Kotlin, Jetpack Compose, Material 3). Aucune permission Internet : rien ne quitte l'appareil.
 

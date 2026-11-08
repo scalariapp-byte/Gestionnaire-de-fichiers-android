@@ -58,25 +58,25 @@ jobs:
         if: env.DO_RELEASE == 'true'
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/Fichiers-${VERSION}.apk"
-          cp app/build/outputs/apk/debug/app-debug.apk "dist/Fichiers-${VERSION}-debug.apk"
+          cp app/build/outputs/apk/release/app-release.apk "dist/Gestionnaire-de-fichiers-${VERSION}.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/Gestionnaire-de-fichiers-${VERSION}-debug.apk"
           (cd dist && sha256sum *.apk > SHA256SUMS.txt)
       - name: Publier la release GitHub
         if: env.DO_RELEASE == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          name: Fichiers ${{ env.VERSION }}
+          name: Gestionnaire de fichiers ${{ env.VERSION }}
           tag_name: ${{ env.VERSION }}
           target_commitish: ${{ github.sha }}
           files: dist/*
           body: |
             Gestionnaire de fichiers Android (Android 8.0+).
 
-            **Installation** : téléchargez `Fichiers-${{ env.VERSION }}.apk`, ouvrez-le sur le téléphone
+            **Installation** : téléchargez `Gestionnaire-de-fichiers-${{ env.VERSION }}.apk`, ouvrez-le sur le téléphone
             (autorisez les sources inconnues), puis activez « Accès à tous les fichiers » au premier lancement.
 
-            - `Fichiers-${{ env.VERSION }}.apk` : version optimisée (recommandée)
-            - `Fichiers-${{ env.VERSION }}-debug.apk` : version de débogage
+            - `Gestionnaire-de-fichiers-${{ env.VERSION }}.apk` : version optimisée (recommandée)
+            - `Gestionnaire-de-fichiers-${{ env.VERSION }}-debug.apk` : version de débogage
             - `SHA256SUMS.txt` : empreintes pour vérifier les fichiers
 
             Signé avec la clé définitive de l'application : les versions suivantes s'installent par-dessus celle-ci.

@@ -247,9 +247,11 @@ private fun Header(actions: HomeActions) {
     ) {
         Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(32.dp))
         Text(
-            "Fichiers",
-            style = MaterialTheme.typography.headlineSmall,
+            "Gestionnaire de fichiers",
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .padding(start = 10.dp)
                 .weight(1f),
