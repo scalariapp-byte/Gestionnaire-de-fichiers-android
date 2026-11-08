@@ -24,7 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -159,8 +160,7 @@ fun HomeScreen(navigator: AppNavigator) {
         },
         onRecent = { item ->
             when {
-                item.type == FileType.IMAGE -> navigator.image(item.path)
-                FileTypes.isTextEditable(item) -> navigator.text(item.path)
+                navigator.openInternal(item) -> Unit
                 !FileOpener.openExternal(context, item.file) ->
                     scope.launch { snackbar.showSnackbar("Aucune application pour ouvrir ce fichier") }
             }
@@ -192,93 +192,52 @@ fun HomeContent(
     actions: HomeActions,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
-    LazyColumn(
-        modifier = Modifier
+    // Conçu pour tenir sur un écran ; le défilement ne sert que sur les très petits écrans.
+    Column(
+        Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface),
-        contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 32.dp),
+            .background(MaterialTheme.colorScheme.surface)
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = contentPadding.calculateBottomPadding() + 12.dp),
     ) {
-        item(key = "header") { Header(actions) }
-        item(key = "search") { SearchPill(actions.onSearch) }
+        Header(actions)
 
-        items(roots, key = { "root:" + it.path.absolutePath }) { root ->
-            if (root.isPrimary) StorageHero(root) { actions.onOpenPath(root.path.absolutePath) }
-            else StorageSmall(root) { actions.onOpenPath(root.path.absolutePath) }
-        }
+        val primary = roots.firstOrNull { it.isPrimary } ?: roots.firstOrNull()
+        if (primary != null) StorageCompact(primary, others = roots - primary, onOpen = actions.onOpenPath)
 
-        item(key = "catTitle") { SectionTitle("Catégories") }
-        item(key = "cats") {
-            Column(Modifier.padding(horizontal = 12.dp)) {
-                HOME_CATEGORIES.chunked(4).forEach { row ->
-                    Row(Modifier.fillMaxWidth()) {
-                        row.forEach { c ->
-                            CategoryTile(c, stats[c], Modifier.weight(1f)) { actions.onCategory(c) }
-                        }
-                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
-                    }
+        SectionTitle("Catégories")
+        Column(Modifier.padding(horizontal = 12.dp)) {
+            HOME_CATEGORIES.chunked(4).forEach { row ->
+                Row(Modifier.fillMaxWidth()) {
+                    row.forEach { c -> CategoryTile(c, stats[c], Modifier.weight(1f)) { actions.onCategory(c) } }
+                    repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
         }
 
-        item(key = "shortTitle") { SectionTitle("Accès rapide") }
-        item(key = "shorts") {
+        SectionTitle("Accès rapide")
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(favorites, key = { "fav:$it" }) { path ->
+                ShortcutChip(
+                    Shortcut(File(path).name.ifEmpty { path }, Icons.Filled.Star, path),
+                    onClick = { actions.onOpenPath(path) },
+                    onLongClick = { actions.onRemoveFavorite(path) },
+                    accent = Color(0xFFFFA000),
+                )
+            }
+            items(shortcuts, key = { it.path }) { s -> ShortcutChip(s, onClick = { actions.onOpenPath(s.path) }) }
+        }
+
+        if (recent.isNotEmpty()) {
+            SectionTitle("Récents", action = "Tout voir") { actions.onCategory(Category.RECENT) }
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(shortcuts, key = { it.path }) { s -> ShortcutChip(s) { actions.onOpenPath(s.path) } }
-            }
-        }
-
-        if (recent.isNotEmpty()) {
-            item(key = "recentTitle") {
-                SectionTitle("Récents", action = "Tout voir") { actions.onCategory(Category.RECENT) }
-            }
-            item(key = "recent") {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(recent, key = { it.path }) { item -> RecentCard(item) { actions.onRecent(item) } }
-                }
-            }
-        }
-
-        if (favorites.isNotEmpty()) {
-            item(key = "favTitle") { SectionTitle("Favoris") }
-            items(favorites, key = { "fav:$it" }) { path ->
-                FavoriteRow(path, onClick = { actions.onOpenPath(path) }, onLongClick = { actions.onRemoveFavorite(path) })
-            }
-        }
-
-        item(key = "toolsTitle") { SectionTitle("Outils") }
-        item(key = "tools") {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                ToolCard(
-                    title = "Coffre-fort",
-                    subtitle = "Fichiers chiffrés",
-                    icon = Icons.Filled.Shield,
-                    brush = Brush.linearGradient(listOf(Color(0xFF4F8BFF), Color(0xFF5B3DF5))),
-                    content = Color.White,
-                    modifier = Modifier.weight(1f),
-                    onClick = actions.onVault,
-                )
-                ToolCard(
-                    title = "Corbeille",
-                    subtitle = "Restaurer",
-                    icon = Icons.Filled.Delete,
-                    brush = Brush.linearGradient(
-                        listOf(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.surfaceContainerHigh)
-                    ),
-                    content = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                    onClick = actions.onTrash,
-                )
+                items(recent, key = { it.path }) { item -> RecentCard(item) { actions.onRecent(item) } }
             }
         }
     }
@@ -290,40 +249,92 @@ private fun Header(actions: HomeActions) {
         Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 4.dp),
+            .padding(start = 20.dp, end = 4.dp, top = 6.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(36.dp))
+        Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(32.dp))
         Text(
             "Fichiers",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
             modifier = Modifier
-                .padding(start = 12.dp)
+                .padding(start = 10.dp)
                 .weight(1f),
         )
+        IconButton(onClick = actions.onSearch) { Icon(Icons.Filled.Search, "Rechercher") }
+        IconButton(onClick = actions.onTrash) { Icon(Icons.Filled.Delete, "Corbeille") }
         IconButton(onClick = actions.onSettings) { Icon(Icons.Filled.Settings, "Paramètres") }
     }
 }
 
 @Composable
-private fun SearchPill(onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier
+private fun StorageCompact(root: StorageRoot, others: List<StorageRoot>, onOpen: (String) -> Unit) {
+    val fraction = percent(root)
+    Column(
+        Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-            .height(56.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .clip(MaterialTheme.shapes.large)
+            .background(Brush.linearGradient(listOf(Color(0xFF3F7DFF), Color(0xFF6A4FD8)))),
     ) {
-        Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                "Rechercher des fichiers",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(start = 14.dp),
-            )
+        Row(
+            Modifier
+                .clickable { onOpen(root.path.absolutePath) }
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                UsageRing(
+                    fraction,
+                    track = Color.White.copy(alpha = 0.22f),
+                    progress = if (fraction > 0.9f) Color(0xFFFFB4AB) else Color.White,
+                    modifier = Modifier.size(58.dp),
+                )
+                Text("${(fraction * 100).toInt()}%", style = MaterialTheme.typography.labelLarge, color = Color.White)
+            }
+            Column(
+                Modifier
+                    .padding(start = 16.dp)
+                    .weight(1f)
+            ) {
+                Text(root.name, style = MaterialTheme.typography.titleMedium, color = Color.White)
+                Text(
+                    "${formatSize(root.used)} sur ${formatSize(root.total)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            }
+            Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.18f)) {
+                Text(
+                    "${formatSize(root.free)} libres",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                )
+            }
+        }
+        others.forEach { other ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpen(other.path.absolutePath) }
+                    .background(Color.Black.copy(alpha = 0.12f))
+                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(if (other.isRemovable) Icons.Filled.SdCard else Icons.Filled.Usb, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Text(
+                    other.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .padding(start = 10.dp)
+                        .weight(1f),
+                )
+                Text("${formatSize(other.free)} libres", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f))
+            }
         }
     }
 }
@@ -345,109 +356,14 @@ private fun UsageRing(fraction: Float, track: Color, progress: Color, modifier: 
 private fun percent(root: StorageRoot): Float = if (root.total > 0) root.used.toFloat() / root.total else 0f
 
 @Composable
-private fun StorageHero(root: StorageRoot, onClick: () -> Unit) {
-    val fraction = percent(root)
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 6.dp)
-            .clip(MaterialTheme.shapes.extraLarge)
-            .background(Brush.linearGradient(listOf(Color(0xFF3F7DFF), Color(0xFF6A4FD8))))
-            .clickable(onClick = onClick)
-            .padding(24.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(root.name, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    formatSize(root.used),
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = Color.White,
-                )
-                Text(
-                    "utilisés sur ${formatSize(root.total)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.8f),
-                )
-                Spacer(Modifier.height(14.dp))
-                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.18f)) {
-                    Text(
-                        "${formatSize(root.free)} libres",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
-                }
-            }
-            Box(contentAlignment = Alignment.Center) {
-                UsageRing(
-                    fraction,
-                    track = Color.White.copy(alpha = 0.22f),
-                    progress = if (fraction > 0.9f) Color(0xFFFFB4AB) else Color.White,
-                    modifier = Modifier.size(104.dp),
-                )
-                Text(
-                    String.format(Locale.FRANCE, "%d %%", (fraction * 100).toInt()),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun StorageSmall(root: StorageRoot, onClick: () -> Unit) {
-    val fraction = percent(root)
-    Surface(
-        onClick = onClick,
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 6.dp),
-    ) {
-        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(contentAlignment = Alignment.Center) {
-                UsageRing(
-                    fraction,
-                    track = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    progress = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp),
-                )
-                Icon(
-                    if (root.isRemovable) Icons.Filled.SdCard else Icons.Filled.Usb,
-                    null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Column(
-                Modifier
-                    .padding(start = 16.dp)
-                    .weight(1f)
-            ) {
-                Text(root.name, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "${formatSize(root.used)} / ${formatSize(root.total)} · ${formatSize(root.free)} libres",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun SectionTitle(text: String, action: String? = null, onAction: () -> Unit = {}) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 8.dp, top = 24.dp, bottom = 10.dp),
+            .padding(start = 20.dp, end = 8.dp, top = 14.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         if (action != null) {
             Text(
                 action,
@@ -469,25 +385,25 @@ private fun CategoryTile(category: Category, stat: MediaQueries.Stat?, modifier:
         modifier
             .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
-            .padding(vertical = 10.dp),
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             Modifier
-                .size(60.dp)
-                .clip(RoundedCornerShape(20.dp))
+                .size(50.dp)
+                .clip(RoundedCornerShape(17.dp))
                 .background(style.color.copy(alpha = 0.14f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(style.icon, contentDescription = null, tint = style.color, modifier = Modifier.size(28.dp))
+            Icon(style.icon, contentDescription = null, tint = style.color, modifier = Modifier.size(24.dp))
         }
         Text(
             category.label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = 5.dp),
         )
         Text(
             stat?.let { if (category == Category.LARGE) formatSize(it.bytes) else String.format(Locale.FRANCE, "%,d", it.count) } ?: " ",
@@ -498,19 +414,29 @@ private fun CategoryTile(category: Category, stat: MediaQueries.Stat?, modifier:
 }
 
 @Composable
-private fun ShortcutChip(shortcut: Shortcut, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
-        Row(Modifier.padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(32.dp)
-                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(shortcut.icon, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-            Text(shortcut.label, modifier = Modifier.padding(start = 10.dp), style = MaterialTheme.typography.labelLarge)
+private fun ShortcutChip(
+    shortcut: Shortcut,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    accent: Color? = null,
+) {
+    Row(
+        Modifier
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(30.dp)
+                .background(accent?.copy(alpha = 0.18f) ?: MaterialTheme.colorScheme.primaryContainer, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(shortcut.icon, null, modifier = Modifier.size(17.dp), tint = accent ?: MaterialTheme.colorScheme.onPrimaryContainer)
         }
+        Text(shortcut.label, modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelLarge, maxLines = 1)
     }
 }
 
@@ -518,11 +444,11 @@ private fun ShortcutChip(shortcut: Shortcut, onClick: () -> Unit) {
 private fun RecentCard(item: FileItem, onClick: () -> Unit) {
     Column(
         Modifier
-            .width(112.dp)
+            .width(84.dp)
             .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick),
     ) {
-        FileThumbnail(item, Modifier.size(112.dp), iconSize = 40)
+        FileThumbnail(item, Modifier.size(84.dp), iconSize = 32)
         Text(
             item.name,
             style = MaterialTheme.typography.bodySmall,
@@ -531,65 +457,6 @@ private fun RecentCard(item: FileItem, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
         )
-        Text(
-            formatSize(item.size),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 2.dp),
-        )
     }
 }
 
-@Composable
-private fun FavoriteRow(path: String, onClick: () -> Unit, onLongClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(44.dp)
-                .background(Color(0xFFFFB300).copy(alpha = 0.16f), RoundedCornerShape(14.dp)),
-            contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Filled.Star, null, tint = Color(0xFFFFA000)) }
-        Column(Modifier.padding(start = 14.dp)) {
-            Text(File(path).name.ifEmpty { path }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            Text(
-                path,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ToolCard(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    brush: Brush,
-    content: Color,
-    modifier: Modifier,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier
-            .clip(MaterialTheme.shapes.large)
-            .background(brush)
-            .clickable(onClick = onClick)
-            .padding(18.dp),
-    ) {
-        Icon(icon, null, tint = content, modifier = Modifier.size(28.dp))
-        Spacer(Modifier.height(18.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, color = content)
-        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = content.copy(alpha = 0.75f))
-    }
-}

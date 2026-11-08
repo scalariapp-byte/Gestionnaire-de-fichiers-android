@@ -14,6 +14,13 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.navigationBarsPadding
+import com.scalari.fichiers.ui.player.MiniPlayer
+import com.scalari.fichiers.ui.player.PlayerConnection
+import com.scalari.fichiers.ui.player.PlayerScreen
+import com.scalari.fichiers.ui.player.rememberPlayerState
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -62,6 +69,8 @@ object Routes {
     const val IMAGE = "image?path={path}&secure={secure}"
     const val VAULT = "vault"
     const val TAB_FILES = "files"
+    const val PLAYER = "player?path={path}"
+    fun player(path: String) = "player?path=${Uri.encode(path)}"
     const val TAB_RECENT = "recent"
     const val TRASH = "trash"
     const val SETTINGS = "settings"
@@ -89,6 +98,15 @@ class AppNavigator(private val nav: NavHostController) {
     fun text(path: String) = nav.navigate(Routes.text(path))
     fun image(path: String, secure: Boolean = false) = nav.navigate(Routes.image(path, secure))
     fun vault() = tab(Tab.VAULT)
+    fun player(path: String) = nav.navigate(Routes.player(path)) { launchSingleTop = true }
+
+    /** Ouvre un fichier avec la visionneuse intégrée adaptée ; false s'il faut une appli externe. */
+    fun openInternal(item: com.scalari.fichiers.data.FileItem): Boolean = when {
+        item.type == com.scalari.fichiers.data.FileType.IMAGE -> { image(item.path); true }
+        item.type == com.scalari.fichiers.data.FileType.VIDEO || item.type == com.scalari.fichiers.data.FileType.AUDIO -> { player(item.path); true }
+        com.scalari.fichiers.data.FileTypes.isTextEditable(item) -> { text(item.path); true }
+        else -> false
+    }
     fun trash() = nav.navigate(Routes.TRASH)
     fun settings() = nav.navigate(Routes.SETTINGS)
 }
@@ -132,15 +150,34 @@ private fun AppNavHost() {
     }
 
     val entry by nav.currentBackStackEntryAsState()
+    val context = LocalContext.current
+    LaunchedEffect(Unit) { PlayerConnection.connect(context) }
+    val controller by PlayerConnection.controller.collectAsStateWithLifecycle()
+    val playerState = rememberPlayerState(controller)
     val currentTab = tabForRoute(entry?.destination?.route)
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
-            AnimatedVisibility(
-                visible = currentTab != null,
-                enter = slideInVertically { it },
-                exit = slideOutVertically { it },
-            ) { AppBottomBar(currentTab, onSelect = navigator::tab) }
+            Column {
+                val showMini = playerState.hasMedia && !playerState.isVideo &&
+                    entry?.destination?.route != Routes.PLAYER && entry?.destination?.route != Routes.IMAGE
+                AnimatedVisibility(visible = showMini, enter = slideInVertically { it }, exit = slideOutVertically { it }) {
+                    Box(if (currentTab == null) Modifier.navigationBarsPadding() else Modifier) {
+                        MiniPlayer(
+                            state = playerState,
+                            onOpen = { navigator.player("") },
+                            onPlayPause = { controller?.let { if (it.isPlaying) it.pause() else it.play() } },
+                            onNext = { controller?.seekToNext() },
+                            onClose = { controller?.run { stop(); clearMediaItems() } },
+                        )
+                    }
+                }
+                AnimatedVisibility(
+                    visible = currentTab != null,
+                    enter = slideInVertically { it },
+                    exit = slideOutVertically { it },
+                ) { AppBottomBar(currentTab, onSelect = navigator::tab) }
+            }
         },
     ) { barPadding ->
     NavHost(
@@ -199,6 +236,9 @@ private fun AppNavHost() {
         }
         composable(Routes.TAB_RECENT) {
             CategoryScreen(Category.RECENT, navigator, isTab = true)
+        }
+        composable(Routes.PLAYER, arguments = listOf(pathArg)) { e ->
+            PlayerScreen(e.arguments?.getString("path") ?: "", onBack = navigator::back)
         }
         composable(Routes.TRASH) {
             TrashScreen(onBack = navigator::back)

@@ -199,9 +199,8 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
     fun open(item: FileItem) {
         when {
             item.isDirectory -> goTo(item.file)
-            item.type == FileType.IMAGE -> navigator.image(item.path)
-            FileTypes.isTextEditable(item) -> navigator.text(item.path)
             item.extension == "zip" -> dialog = BrowserDialog.Archive(item)
+            navigator.openInternal(item) -> Unit
             !FileOpener.openExternal(context, item.file) -> message("Aucune application pour ouvrir ce fichier")
         }
     }

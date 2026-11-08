@@ -34,6 +34,9 @@ import com.scalari.fichiers.data.MediaQueries
 import com.scalari.fichiers.data.StorageRoot
 import com.scalari.fichiers.data.ThemeMode
 import com.scalari.fichiers.ui.AppBottomBar
+import com.scalari.fichiers.ui.player.AudioPlayerContent
+import com.scalari.fichiers.ui.player.MiniPlayer
+import com.scalari.fichiers.ui.player.PlayerUiState
 import com.scalari.fichiers.ui.Tab
 import com.scalari.fichiers.ui.browser.Breadcrumbs
 import com.scalari.fichiers.ui.browser.PasteBar
@@ -211,6 +214,29 @@ class ScreenshotTest {
 
     @Test fun light_tabs() = capture("11_accueil_clair_onglets") {
         Scaffold(bottomBar = { AppBottomBar(Tab.HOME) {} }) { p -> Column(Modifier.padding(p)) { Home() } }
+    }
+
+    @Test fun audio_player() = capture("12_lecteur_audio", mode = ThemeMode.BLACK) {
+        AudioPlayerContent(
+            state = PlayerUiState(
+                hasMedia = true, isPlaying = true, title = "Podcast épisode 12", subtitle = "Les Ondes · Saison 3",
+                position = 754_000, duration = 2_712_000, index = 11, count = 24, shuffle = true,
+            ),
+            onBack = {}, onPlayPause = {}, onPrevious = {}, onNext = {}, onSeek = {}, onShuffle = {}, onRepeat = {},
+        )
+    }
+
+    @Test fun mini_player() = capture("13_mini_lecteur") {
+        Scaffold(bottomBar = {
+            Column {
+                MiniPlayer(
+                    PlayerUiState(hasMedia = true, isPlaying = true, title = "Podcast épisode 12", subtitle = "Les Ondes",
+                        position = 754_000, duration = 2_712_000),
+                    onOpen = {}, onPlayPause = {}, onNext = {}, onClose = {},
+                )
+                AppBottomBar(Tab.HOME) {}
+            }
+        }) { p -> Column(Modifier.padding(p)) { Home() } }
     }
 
     @Test fun settings() = capture("08_parametres") { SettingsScreen(onBack = {}) }

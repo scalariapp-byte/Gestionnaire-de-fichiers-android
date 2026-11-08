@@ -34,19 +34,22 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val stats: StateFlow<Map<Category, MediaQueries.Stat>> = _stats.asStateFlow()
 
     init {
-        refresh()
-        viewModelScope.launch { OperationManager.changes.collect { refresh() } }
+        refresh(withStats = true)
+        viewModelScope.launch { OperationManager.changes.collect { refresh(withStats = true) } }
     }
 
-    fun refresh() {
+    /** [withStats] : recalcule aussi les compteurs des catégories (requêtes MediaStore plus coûteuses). */
+    fun refresh(withStats: Boolean = false) {
         viewModelScope.launch {
             val ctx = getApplication<Application>()
             _roots.value = withContext(Dispatchers.IO) { StorageRoots.list(ctx) }
             val showHidden = FileManagerApp.instance.settingsState.value.showHidden
             _recent.value = MediaQueries.query(ctx, Category.RECENT, showHidden, limit = 30)
-            val stats = HashMap<Category, MediaQueries.Stat>()
-            for (c in HOME_CATEGORIES) stats[c] = MediaQueries.stat(ctx, c, showHidden)
-            _stats.value = stats
+            if (withStats || _stats.value.isEmpty()) {
+                val stats = HashMap<Category, MediaQueries.Stat>()
+                for (c in HOME_CATEGORIES) stats[c] = MediaQueries.stat(ctx, c, showHidden)
+                _stats.value = stats
+            }
         }
     }
 }

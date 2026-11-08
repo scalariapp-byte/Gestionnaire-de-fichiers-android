@@ -135,8 +135,7 @@ fun CategoryScreen(category: Category, navigator: AppNavigator, isTab: Boolean =
 
     fun open(item: FileItem) {
         when {
-            item.type == FileType.IMAGE -> navigator.image(item.path)
-            FileTypes.isTextEditable(item) -> navigator.text(item.path)
+            navigator.openInternal(item) -> Unit
             !FileOpener.openExternal(context, item.file) ->
                 scope.launch { snackbar.showSnackbar("Aucune application pour ouvrir ce fichier") }
         }
