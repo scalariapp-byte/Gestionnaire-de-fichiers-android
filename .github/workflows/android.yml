@@ -29,7 +29,23 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Clé de signature
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > app/release.p12
+            echo "Clé de signature définitive chargée."
+          elif [ "$DO_RELEASE" = "true" ]; then
+            echo "::error::Secrets KEYSTORE_BASE64 / KEYSTORE_PASSWORD absents : release refusée (l'APK serait signé avec une clé jetable et ne s'installerait pas par-dessus la version précédente)."
+            exit 1
+          else
+            echo "Pas de clé définitive : build de test signé avec la clé de debug."
+          fi
       - name: Build APK (debug + release)
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleDebug assembleRelease
@@ -63,7 +79,7 @@ jobs:
             - `Fichiers-${{ env.VERSION }}-debug.apk` : version de débogage
             - `SHA256SUMS.txt` : empreintes pour vérifier les fichiers
 
-            Note : APK signé avec une clé de debug (installation directe uniquement, pas de Play Store).
+            Signé avec la clé définitive de l'application : les versions suivantes s'installent par-dessus celle-ci.
 
   screenshots:
     if: github.event_name == 'push'

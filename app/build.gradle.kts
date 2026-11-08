@@ -17,7 +17,28 @@ android {
         versionName = "1.7.0"
     }
 
+    // Clé de signature fixe : chaque version s'installe par-dessus la précédente.
+    // La CI reconstitue app/release.p12 depuis le secret KEYSTORE_BASE64 ; le mot de passe
+    // vient du secret KEYSTORE_PASSWORD. Sans eux, signature de debug (builds de test).
+    val keystoreFile = file("release.p12")
+    val keystorePassword: String? = System.getenv("KEYSTORE_PASSWORD")?.takeIf { it.isNotBlank() }
+    signingConfigs {
+        if (keystorePassword != null && keystoreFile.exists()) {
+            create("release") {
+                storeFile = keystoreFile
+                storeType = "PKCS12"
+                storePassword = keystorePassword
+                keyAlias = "fichiers"
+                keyPassword = keystorePassword
+            }
+        }
+    }
+    val appSigning = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+
     buildTypes {
+        debug {
+            signingConfig = appSigning
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -25,9 +46,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Signé avec la clé de debug pour pouvoir installer l'APK directement.
-            // Remplacer par une vraie clé avant toute publication sur un store.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = appSigning
         }
     }
 

@@ -10,3 +10,6 @@ build/
 *.keystore
 !debug.keystore
 app/screenshots/
+app/release.p12
+*.p12
+*.jks
