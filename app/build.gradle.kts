@@ -13,8 +13,13 @@ android {
         applicationId = "com.scalari.fichiers"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
+        versionCode = 14
         versionName = "1.9.0"
+
+        // Téléphones uniquement (ARM) : n'embarque pas les bibliothèques natives pour émulateurs x86.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     // Clé de signature fixe : chaque version s'installe par-dessus la précédente.
@@ -95,10 +100,12 @@ dependencies {
     implementation("io.coil-kt:coil-video:2.7.0")
 
     // Lecteur audio/vidéo intégré (ExoPlayer) + session pour l'arrière-plan et la notification.
-    val media3 = "1.4.1"
+    val media3 = "1.5.0"
     implementation("androidx.media3:media3-exoplayer:$media3")
     implementation("androidx.media3:media3-ui:$media3")
     implementation("androidx.media3:media3-session:$media3")
+    // Moteur FFmpeg (audio) : AC3/E-AC3, DTS, TrueHD… quand le téléphone ne sait pas les décoder.
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
     implementation("com.google.guava:guava:33.3.1-android")
 
     // Archives : 7z, TAR (gz/bz2/xz) et RAR4.
