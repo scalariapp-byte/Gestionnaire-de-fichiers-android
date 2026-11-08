@@ -48,7 +48,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -348,19 +347,25 @@ private fun CleanupScreen(
     navigator: AppNavigator,
     load: suspend (onProgress: (String) -> Unit) -> Pair<List<CleanupItem>, Set<String>>,
     emptyText: String,
+    /** Après une suppression : retire de la liste ce qui n'existe plus, sans tout réanalyser. */
+    prune: (List<CleanupItem>) -> List<CleanupItem> = { list -> list.filter { it.file.exists() } },
 ) {
     val settings by FileManagerApp.instance.settingsState.collectAsStateWithLifecycle()
     var items by remember { mutableStateOf<List<CleanupItem>?>(null) }
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var progress by remember { mutableStateOf("Analyse en cours…") }
     var confirm by remember { mutableStateOf(false) }
-    var generation by remember { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) { OperationManager.changes.collect { generation++ } }
-    LaunchedEffect(generation) {
-        items = null
+    LaunchedEffect(Unit) {
         val (list, pre) = load { progress = it }
         items = list
         selected = pre
+        OperationManager.changes.collect {
+            val current = items ?: return@collect
+            val remaining = withContext(Dispatchers.IO) { prune(current) }
+            val paths = remaining.mapTo(HashSet()) { it.file.absolutePath }
+            items = remaining
+            selected = selected.filterTo(HashSet()) { it in paths }
+        }
     }
     val list = items
     val selectedBytes = list.orEmpty().filter { it.file.absolutePath in selected }.sumOf { it.size }
@@ -468,13 +473,14 @@ private fun CleanupScreen(
 
 @Composable
 fun DuplicatesScreen(navigator: AppNavigator) {
+    val context = LocalContext.current
     val showHidden = FileManagerApp.instance.settingsState.value.showHidden
     CleanupScreen(
         title = "Fichiers en double",
         navigator = navigator,
         emptyText = "Aucun doublon trouvé (fichiers de plus de 100 Ko).",
         load = { onProgress ->
-            val groups: List<DuplicateGroup> = StorageAnalyzer.duplicates(StorageRoots.primary(), showHidden) { step, done, total ->
+            val groups: List<DuplicateGroup> = StorageAnalyzer.duplicates(context, StorageRoots.primary(), showHidden) { step, done, total ->
                 onProgress(if (total > 0) "$step… $done / $total" else if (done > 0) "$step… $done fichiers" else "$step…")
             }
             val items = groups.flatMapIndexed { gi, g ->
@@ -493,6 +499,8 @@ fun DuplicatesScreen(navigator: AppNavigator) {
             val pre = groups.flatMap { it.files.drop(1) }.mapTo(HashSet()) { it.absolutePath }
             items to pre
         },
+        // Après suppression : un groupe réduit à un seul fichier n'est plus un doublon.
+        prune = { list -> list.filter { it.file.exists() }.groupBy { it.group }.values.filter { it.size > 1 }.flatten() },
     )
 }
 

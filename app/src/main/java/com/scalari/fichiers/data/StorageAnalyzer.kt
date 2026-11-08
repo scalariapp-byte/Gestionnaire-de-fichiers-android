@@ -9,7 +9,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.security.MessageDigest
 
 data class SizedEntry(val file: File, val size: Long, val isDirectory: Boolean, val files: Int)
 
@@ -59,78 +58,70 @@ object StorageAnalyzer {
         }
 
     /**
-     * Doublons stricts : même taille, puis même empreinte partielle, puis même SHA-256 complet.
-     * [onProgress] : (étape, fait, total).
+     * Inventaire rapide via l'index MediaStore (taille connue sans parcourir le disque) ;
+     * repli sur un parcours du disque si l'index est indisponible ou vide.
      */
-    suspend fun duplicates(root: File, showHidden: Boolean, onProgress: (String, Int, Int) -> Unit): List<DuplicateGroup> =
+    @Suppress("DEPRECATION")
+    private suspend fun inventory(context: Context, root: File, showHidden: Boolean, onProgress: (String, Int, Int) -> Unit): List<Candidate> {
+        val rootPath = root.absolutePath + "/"
+        val out = ArrayList<Candidate>()
+        val data = android.provider.MediaStore.MediaColumns.DATA
+        val size = android.provider.MediaStore.MediaColumns.SIZE
+        val date = android.provider.MediaStore.MediaColumns.DATE_MODIFIED
+        runCatching {
+            context.contentResolver.query(
+                android.provider.MediaStore.Files.getContentUri("external"),
+                arrayOf(data, size, date), "$size>=?", arrayOf(MIN_DUPLICATE_SIZE.toString()), null,
+            )?.use { c ->
+                val iData = c.getColumnIndexOrThrow(data)
+                val iSize = c.getColumnIndexOrThrow(size)
+                val iDate = c.getColumnIndexOrThrow(date)
+                while (c.moveToNext()) {
+                    val path = c.getString(iData) ?: continue
+                    if (!path.startsWith(rootPath)) continue
+                    if (path.contains("/${VaultManager.DIR_NAME}/") || path.contains("/${TrashManager.TRASH_DIR}/")) continue
+                    if (!showHidden && path.contains("/.")) continue
+                    out += Candidate(path, c.getLong(iSize), c.getLong(iDate) * 1000)
+                    if (out.size % 2000 == 0) onProgress("Inventaire des fichiers", out.size, 0)
+                }
+            }
+        }
+        if (out.isNotEmpty()) return out
+        root.walkTopDown().onEnter { it == root || !skip(it, showHidden) }.forEach { f ->
+            if (f.isFile && !skip(f, showHidden)) {
+                val len = f.length()
+                if (len >= MIN_DUPLICATE_SIZE) out += Candidate(f.absolutePath, len, f.lastModified())
+                if (out.size % 500 == 0) {
+                    currentCoroutineContext().ensureActive()
+                    onProgress("Inventaire des fichiers", out.size, 0)
+                }
+            }
+        }
+        return out
+    }
+
+    /**
+     * Doublons stricts (taille, empreinte de 3 extraits, puis SHA-256 complet), lectures en
+     * parallèle et empreintes mises en cache entre deux analyses. [onProgress] : (étape, fait, total).
+     */
+    suspend fun duplicates(context: Context, root: File, showHidden: Boolean, onProgress: (String, Int, Int) -> Unit): List<DuplicateGroup> =
         withContext(Dispatchers.IO) {
             onProgress("Inventaire des fichiers", 0, 0)
-            val bySize = HashMap<Long, MutableList<File>>()
-            var seen = 0
-            root.walkTopDown().onEnter { it == root || !skip(it, showHidden) }.forEach { f ->
-                if (f.isFile && !skip(f, showHidden)) {
-                    val len = f.length()
-                    if (len >= MIN_DUPLICATE_SIZE) bySize.getOrPut(len) { ArrayList() } += f
-                    seen++
-                    if (seen % 500 == 0) {
-                        currentCoroutineContext().ensureActive()
-                        onProgress("Inventaire des fichiers", seen, 0)
-                    }
-                }
+            val indexed = inventory(context, root, showHidden, onProgress)
+            // L'index peut contenir des fichiers supprimés ou modifiés depuis : on ne garde que les
+            // fichiers présents, avec leur taille et leur date réelles (pour la validité du cache).
+            val sameSizeCandidates = indexed.groupBy { it.size }.values.filter { it.size > 1 }.flatten()
+            val checked = sameSizeCandidates.mapNotNull { c ->
+                val f = File(c.path)
+                if (f.isFile) Candidate(c.path, f.length(), f.lastModified()) else null
             }
-            val sameSize = bySize.values.filter { it.size > 1 }
-
-            fun regroup(groups: List<List<File>>, label: String, key: (File) -> String?): List<List<File>> {
-                val total = groups.sumOf { it.size }
-                var done = 0
-                val result = ArrayList<List<File>>()
-                for (g in groups) {
-                    val byKey = HashMap<String, MutableList<File>>()
-                    for (f in g) {
-                        key(f)?.let { byKey.getOrPut(it) { ArrayList() } += f }
-                        done++
-                        if (done % 20 == 0) onProgress(label, done, total)
-                    }
-                    byKey.values.filter { it.size > 1 }.forEach { result += it }
-                }
-                return result
-            }
-
-            currentCoroutineContext().ensureActive()
-            val partial = regroup(sameSize, "Comparaison rapide") { partialHash(it) }
-            currentCoroutineContext().ensureActive()
-            val full = regroup(partial, "Vérification complète") { fullHash(it) }
-            full.map { g -> DuplicateGroup(g.sortedBy { it.lastModified() }, g.first().length()) }
-                .sortedByDescending { it.wasted }
+            val cache = HashCache(File(context.filesDir, "empreintes.tsv"))
+            val groups = DuplicateFinder.find(checked, cache, parallelism = 4, onProgress = onProgress)
+            cache.save(checked.mapTo(HashSet()) { it.path })
+            groups.map { g ->
+                DuplicateGroup(g.sortedBy { it.mtime }.map { File(it.path) }, g.first().size)
+            }.sortedByDescending { it.wasted }
         }
-
-    private fun partialHash(f: File): String? = runCatching {
-        val md = MessageDigest.getInstance("SHA-256")
-        java.io.RandomAccessFile(f, "r").use { raf ->
-            val buf = ByteArray(16 * 1024)
-            val n = raf.read(buf)
-            if (n > 0) md.update(buf, 0, n)
-            if (raf.length() > buf.size * 2) {
-                raf.seek(raf.length() - buf.size)
-                val m = raf.read(buf)
-                if (m > 0) md.update(buf, 0, m)
-            }
-        }
-        md.digest().joinToString("") { "%02x".format(it) }
-    }.getOrNull()
-
-    private fun fullHash(f: File): String? = runCatching {
-        val md = MessageDigest.getInstance("SHA-256")
-        f.inputStream().use { input ->
-            val buf = ByteArray(256 * 1024)
-            while (true) {
-                val n = input.read(buf)
-                if (n < 0) break
-                md.update(buf, 0, n)
-            }
-        }
-        md.digest().joinToString("") { "%02x".format(it) }
-    }.getOrNull()
 
     /** Fichiers APK dont l'application est déjà installée, dans la même version ou plus récente. */
     @Suppress("DEPRECATION")
