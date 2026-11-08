@@ -12,7 +12,13 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.SdCard
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Usb
+import androidx.compose.material3.LocalContentColor
+import com.scalari.fichiers.data.StorageRoot
+import com.scalari.fichiers.data.formatSize
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.derivedStateOf
@@ -46,6 +52,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -332,7 +339,12 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                 .fillMaxSize()
         ) {
             if (!state.searchActive) {
-                Breadcrumbs(state.rootDir, state.rootName, state.currentDir, onClick = ::goTo)
+                Breadcrumbs(
+                    state.rootDir, state.rootName, state.currentDir, onClick = ::goTo,
+                    volumes = state.volumes,
+                    onOpenVolumes = vm::refreshVolumes,
+                    onSelectVolume = { savePosition(); vm.switchVolume(it) },
+                )
             }
             if (state.searching) LinearProgressIndicator(Modifier.fillMaxWidth())
 
@@ -646,7 +658,15 @@ private fun SearchTopBar(query: String, folderName: String, onQuery: (String) ->
 }
 
 @Composable
-fun Breadcrumbs(root: File, rootName: String, current: File, onClick: (File) -> Unit) {
+fun Breadcrumbs(
+    root: File,
+    rootName: String,
+    current: File,
+    onClick: (File) -> Unit,
+    volumes: List<StorageRoot> = emptyList(),
+    onOpenVolumes: () -> Unit = {},
+    onSelectVolume: (StorageRoot) -> Unit = {},
+) {
     val segments = remember(root, current) {
         val list = ArrayList<File>()
         var f: File? = current
@@ -659,6 +679,7 @@ fun Breadcrumbs(root: File, rootName: String, current: File, onClick: (File) -> 
     }
     val rowState = rememberLazyListState()
     LaunchedEffect(segments.size) { if (segments.isNotEmpty()) rowState.animateScrollToItem(segments.lastIndex) }
+    val currentVolume = volumes.firstOrNull { it.path.absolutePath == root.absolutePath }
     LazyRow(
         state = rowState,
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -668,25 +689,80 @@ fun Breadcrumbs(root: File, rootName: String, current: File, onClick: (File) -> 
     ) {
         itemsIndexed(segments, key = { _, f -> f.absolutePath }) { index, f ->
             val last = index == segments.lastIndex
-            Surface(
-                shape = CircleShape,
-                color = if (last) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = if (last) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .clip(CircleShape)
-                    .clickable(enabled = !last) { onClick(f) },
-            ) {
-                Row(
-                    Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (index == 0) {
-                        Icon(Icons.Filled.Home, null, Modifier.size(16.dp).padding(end = 2.dp))
+            val chipColor = if (last) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+            val chipContent = if (last) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+            if (index == 0) {
+                // Première pastille : le stockage. Un appui ouvre la liste des stockages.
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    Surface(
+                        shape = CircleShape,
+                        color = chipColor,
+                        contentColor = chipContent,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable { onOpenVolumes(); menu = true },
+                    ) {
+                        Row(Modifier.padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (currentVolume?.isPrimary == false) Icons.Filled.SdCard else Icons.Filled.Smartphone,
+                                null, Modifier.size(16.dp),
+                            )
+                            Text(rootName, style = MaterialTheme.typography.labelLarge, maxLines = 1, modifier = Modifier.padding(start = 6.dp))
+                            Icon(Icons.Filled.ArrowDropDown, "Changer de stockage", Modifier.size(20.dp))
+                        }
                     }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        volumes.forEach { v ->
+                            val selected = v.path.absolutePath == root.absolutePath
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(
+                                        if (v.isPrimary) Icons.Filled.Smartphone else if (v.isRemovable) Icons.Filled.SdCard else Icons.Filled.Usb,
+                                        null,
+                                        tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                                    )
+                                },
+                                text = {
+                                    Column {
+                                        Text(v.name, style = MaterialTheme.typography.bodyLarge)
+                                        Text(
+                                            "${formatSize(v.free)} libres sur ${formatSize(v.total)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                },
+                                trailingIcon = { if (selected) Icon(Icons.Filled.Check, null, tint = MaterialTheme.colorScheme.primary) },
+                                onClick = {
+                                    menu = false
+                                    if (selected) onClick(v.path) else onSelectVolume(v)
+                                },
+                            )
+                        }
+                        if (volumes.size <= 1) {
+                            DropdownMenuItem(
+                                enabled = false,
+                                text = { Text("Aucune carte SD ni clé USB détectée", style = MaterialTheme.typography.bodySmall) },
+                                onClick = {},
+                            )
+                        }
+                    }
+                }
+            } else {
+                Surface(
+                    shape = CircleShape,
+                    color = chipColor,
+                    contentColor = chipContent,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable(enabled = !last) { onClick(f) },
+                ) {
                     Text(
-                        if (index == 0) rootName else f.name,
+                        f.name,
                         style = MaterialTheme.typography.labelLarge,
                         maxLines = 1,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     )
                 }
             }

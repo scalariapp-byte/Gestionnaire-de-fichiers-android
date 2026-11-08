@@ -41,6 +41,8 @@ data class BrowserUiState(
     val searching: Boolean = false,
     /** Vrai s'il y a un dossier précédent dans l'historique (le bouton Retour y revient). */
     val canGoBack: Boolean = false,
+    /** Stockages disponibles (interne, carte SD, clé USB) pour changer de volume. */
+    val volumes: List<com.scalari.fichiers.data.StorageRoot> = emptyList(),
 ) {
     val visibleItems: List<FileItem> get() = searchResults ?: items
     val selectionMode: Boolean get() = selected.isNotEmpty()
@@ -73,6 +75,7 @@ class BrowserViewModel(app: Application, startPath: String?, openSearch: Boolean
         )
         state = _state.asStateFlow()
         load()
+        refreshVolumes()
         viewModelScope.launch {
             settings.map { listOf(it.showHidden, it.sortBy, it.ascending, it.foldersFirst) }
                 .distinctUntilChanged()
@@ -108,6 +111,19 @@ class BrowserViewModel(app: Application, startPath: String?, openSearch: Boolean
                 _state.update { st -> if (st.currentDir == dir && st.items === items) st.copy(items = counted) else st }
             }
         }
+    }
+
+    fun refreshVolumes() {
+        viewModelScope.launch {
+            val list = withContext(Dispatchers.IO) { StorageRoots.list(getApplication<Application>()) }
+            _state.update { it.copy(volumes = list) }
+        }
+    }
+
+    /** Passe sur un autre stockage (carte SD, clé USB…), à sa racine. */
+    fun switchVolume(root: com.scalari.fichiers.data.StorageRoot) {
+        _state.update { it.copy(rootDir = root.path, rootName = root.name) }
+        navigateTo(root.path)
     }
 
     /** Dossiers visités avant le dossier courant, comme l'historique d'un navigateur web. */
