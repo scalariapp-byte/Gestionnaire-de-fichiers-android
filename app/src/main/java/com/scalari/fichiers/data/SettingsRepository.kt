@@ -29,6 +29,8 @@ data class AppSettings(
     val confirmDelete: Boolean = true,
     val useTrash: Boolean = true,
     val favorites: List<String> = emptyList(),
+    /** Autorise captures et enregistrement d'écran dans le coffre (bloqués par défaut). */
+    val vaultScreenshots: Boolean = false,
 )
 
 class SettingsRepository(private val context: Context) {
@@ -44,6 +46,7 @@ class SettingsRepository(private val context: Context) {
         val CONFIRM_DELETE = booleanPreferencesKey("confirm_delete")
         val USE_TRASH = booleanPreferencesKey("use_trash")
         val FAVORITES = stringSetPreferencesKey("favorites")
+        val VAULT_SCREENSHOTS = booleanPreferencesKey("vault_screenshots")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data
@@ -60,6 +63,7 @@ class SettingsRepository(private val context: Context) {
                 confirmDelete = p[Keys.CONFIRM_DELETE] ?: true,
                 useTrash = p[Keys.USE_TRASH] ?: true,
                 favorites = p[Keys.FAVORITES]?.sortedBy { it.lowercase() } ?: emptyList(),
+                vaultScreenshots = p[Keys.VAULT_SCREENSHOTS] ?: false,
             )
         }
 
@@ -76,6 +80,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setDynamicColor(value: Boolean) { context.dataStore.edit { it[Keys.DYNAMIC_COLOR] = value } }
     suspend fun setConfirmDelete(value: Boolean) { context.dataStore.edit { it[Keys.CONFIRM_DELETE] = value } }
     suspend fun setUseTrash(value: Boolean) { context.dataStore.edit { it[Keys.USE_TRASH] = value } }
+    suspend fun setVaultScreenshots(value: Boolean) { context.dataStore.edit { it[Keys.VAULT_SCREENSHOTS] = value } }
 
     suspend fun toggleFavorite(path: String) {
         context.dataStore.edit {

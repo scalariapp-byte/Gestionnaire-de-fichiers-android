@@ -2,6 +2,10 @@
 
 package com.scalari.fichiers.ui.vault
 
+import com.scalari.fichiers.FileManagerApp
+import kotlinx.coroutines.flow.map
+import androidx.compose.material.icons.filled.Screenshot
+import androidx.compose.ui.draw.scale
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -109,17 +113,27 @@ tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-/** Empêche captures d'écran et aperçu dans les applis récentes tant que l'écran est affiché. */
+/**
+ * Empêche captures d'écran et aperçu dans les applis récentes tant que l'écran est affiché,
+ * sauf si l'utilisateur a autorisé les captures dans le coffre.
+ */
 private var secureCount = 0
 
 @Composable
 fun SecureWindow() {
     val activity = LocalContext.current.findActivity()
-    DisposableEffect(activity) {
+    val allowed by FileManagerApp.instance.settings.settings
+        .map { it.vaultScreenshots }
+        .collectAsStateWithLifecycle(initialValue = false)
+    DisposableEffect(activity, allowed) {
         // Compteur : pendant une transition, deux écrans sécurisés coexistent.
-        if (secureCount++ == 0) activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        onDispose {
-            if (--secureCount == 0) activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        if (allowed) {
+            onDispose { }
+        } else {
+            if (secureCount++ == 0) activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            onDispose {
+                if (--secureCount == 0) activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            }
         }
     }
 }
@@ -388,6 +402,27 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
                                     },
                                 )
                             }
+                            val screenshots by FileManagerApp.instance.settings.settings
+                                .map { it.vaultScreenshots }
+                                .collectAsStateWithLifecycle(initialValue = false)
+                            val menuScope = rememberCoroutineScope()
+                            DropdownMenuItem(
+                                text = { Text("Captures d'écran") },
+                                leadingIcon = { Icon(Icons.Filled.Screenshot, null) },
+                                trailingIcon = {
+                                    androidx.compose.material3.Switch(
+                                        checked = screenshots,
+                                        onCheckedChange = null,
+                                        modifier = Modifier.scale(0.8f),
+                                    )
+                                },
+                                onClick = {
+                                    menu = false
+                                    val now = !screenshots
+                                    menuScope.launch { FileManagerApp.instance.settings.setVaultScreenshots(now) }
+                                    message(if (now) "Captures d'écran autorisées dans le coffre" else "Captures d'écran bloquées dans le coffre")
+                                },
+                            )
                             DropdownMenuItem(
                                 text = { Text("Changer le code") },
                                 leadingIcon = { Icon(Icons.Filled.LockReset, null) },

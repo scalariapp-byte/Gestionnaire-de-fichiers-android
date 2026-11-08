@@ -98,6 +98,9 @@ fun SettingsScreen(onBack: () -> Unit) {
             SwitchItem("Confirmer avant suppression", null, settings.confirmDelete) {
                 scope.launch { repo.setConfirmDelete(it) }
             }
+            SwitchItem("Captures d'écran dans le coffre", "Autorise captures et enregistrement d'écran du coffre-fort", settings.vaultScreenshots) {
+                scope.launch { repo.setVaultScreenshots(it) }
+            }
 
             }
             Group("Partager l'application") {
