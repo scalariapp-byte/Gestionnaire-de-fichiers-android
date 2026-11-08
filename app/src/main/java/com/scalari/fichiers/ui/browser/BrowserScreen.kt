@@ -704,8 +704,9 @@ fun PasteBar(clip: Clip, onPaste: () -> Unit, onCancel: () -> Unit) {
         Row(Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    "${clip.files.size} élément${if (clip.files.size > 1) "s" else ""} ${if (clip.cut) "à déplacer" else "à copier"}",
+                    "${clip.files.size} ${if (clip.cut) "à déplacer" else "à copier"}",
                     style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
                 )
                 Text(
                     clip.files.first().name + if (clip.files.size > 1) "…" else "",

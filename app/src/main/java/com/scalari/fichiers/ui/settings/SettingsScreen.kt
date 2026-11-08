@@ -76,7 +76,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 supportingContent = { Text(settings.themeMode.label) },
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                SwitchItem("Couleurs dynamiques", "Couleurs issues du fond d'écran (Material You)", settings.dynamicColor) {
+                SwitchItem("Couleurs dynamiques", "Couleurs tirées du fond d'écran", settings.dynamicColor) {
                     scope.launch { repo.setDynamicColor(it) }
                 }
             }

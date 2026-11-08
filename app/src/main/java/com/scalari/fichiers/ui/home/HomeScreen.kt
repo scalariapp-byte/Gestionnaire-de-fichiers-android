@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderZip
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -105,7 +106,7 @@ private fun Category.style(): CategoryStyle = when (this) {
     Category.ARCHIVES -> CategoryStyle(Icons.Filled.FolderZip, Color(0xFFB0793F))
     Category.APKS -> CategoryStyle(Icons.Filled.Apps, Color(0xFF5BA33B))
     Category.LARGE -> CategoryStyle(Icons.Filled.Storage, Color(0xFFF07A1A))
-    Category.RECENT -> CategoryStyle(Icons.Filled.Storage, Color(0xFF607D8B))
+    Category.RECENT -> CategoryStyle(Icons.Filled.History, Color(0xFF0E9AA7))
 }
 
 data class Shortcut(val label: String, val icon: ImageVector, val path: String)

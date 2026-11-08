@@ -3,7 +3,6 @@ package com.scalari.fichiers.data
 import android.webkit.MimeTypeMap
 import androidx.compose.runtime.Immutable
 import java.io.File
-import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -101,9 +100,28 @@ fun formatSize(bytes: Long): String {
     else String.format(Locale.FRANCE, "%.1f %s", value, units[unit])
 }
 
-private val dateFormat: DateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+private val timeFmt = java.text.SimpleDateFormat("HH:mm", Locale.FRANCE)
+private val dayFmt = java.text.SimpleDateFormat("d MMM", Locale.FRANCE)
+private val yearFmt = java.text.SimpleDateFormat("d MMM yyyy", Locale.FRANCE)
 
-fun formatDate(millis: Long): String = dateFormat.format(Date(millis))
+/** « Aujourd'hui, 14:32 », « Hier, 09:10 », « 5 nov., 18:00 », « 30 oct. 2024 ». */
+fun formatDate(millis: Long): String {
+    val cal = java.util.Calendar.getInstance()
+    val today = cal.get(java.util.Calendar.DAY_OF_YEAR) to cal.get(java.util.Calendar.YEAR)
+    cal.add(java.util.Calendar.DAY_OF_YEAR, -1)
+    val yesterday = cal.get(java.util.Calendar.DAY_OF_YEAR) to cal.get(java.util.Calendar.YEAR)
+    cal.timeInMillis = millis
+    val day = cal.get(java.util.Calendar.DAY_OF_YEAR) to cal.get(java.util.Calendar.YEAR)
+    val date = Date(millis)
+    return synchronized(timeFmt) {
+        when {
+            day == today -> "Aujourd'hui, ${timeFmt.format(date)}"
+            day == yesterday -> "Hier, ${timeFmt.format(date)}"
+            day.second == today.second -> "${dayFmt.format(date)}, ${timeFmt.format(date)}"
+            else -> yearFmt.format(date)
+        }
+    }
+}
 
 /** Tri « naturel » : fichier2 < fichier10, insensible à la casse. */
 object NaturalOrder : Comparator<String> {

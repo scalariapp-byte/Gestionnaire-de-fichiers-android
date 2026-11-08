@@ -57,6 +57,7 @@ fun PinPad(
     val haptics = LocalHapticFeedback.current
     LaunchedEffect(resetKey) { pin = "" }
 
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
     Column(
         Modifier
             .widthIn(max = 360.dp)
@@ -81,7 +82,7 @@ fun PinPad(
                         .size(14.dp)
                         .scale(s)
                         .background(
-                            if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                            if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                             CircleShape,
                         )
                 )
@@ -117,7 +118,12 @@ fun PinPad(
                                 onClick = { if (pin.isNotEmpty()) pin = pin.dropLast(1) },
                                 enabled = !busy && pin.isNotEmpty(),
                                 modifier = Modifier.size(72.dp),
-                            ) { Icon(Icons.Filled.Backspace, "Effacer") }
+                            ) {
+                                Icon(
+                                    Icons.Filled.Backspace, "Effacer",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (pin.isEmpty()) 0.38f else 1f),
+                                )
+                            }
 
                             else -> FilledTonalIconButton(
                                 onClick = {
@@ -140,5 +146,6 @@ fun PinPad(
             enabled = !busy && pin.length >= minLength,
             modifier = Modifier.size(64.dp),
         ) { Icon(Icons.Filled.Check, "Valider") }
+    }
     }
 }

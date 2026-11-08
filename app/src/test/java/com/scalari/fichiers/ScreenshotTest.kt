@@ -62,7 +62,7 @@ import java.io.File
 class ScreenshotTest {
 
     private val base = File("/storage/emulated/0")
-    private val now = 1_762_560_000_000L
+    private val now = System.currentTimeMillis()
 
     private fun item(name: String, dir: Boolean = false, size: Long = 0, children: Int = -1, ago: Long = 0) = FileItem(
         file = File(base, "Documents/Travail/$name"),
@@ -111,6 +111,7 @@ class ScreenshotTest {
                 Category.ARCHIVES to MediaQueries.Stat(41, 3_900_000_000),
                 Category.APKS to MediaQueries.Stat(12, 640_000_000),
                 Category.LARGE to MediaQueries.Stat(58, 38_400_000_000),
+                Category.RECENT to MediaQueries.Stat(143, 2_100_000_000),
             ),
             shortcuts = defaultShortcuts(),
             favorites = listOf("/storage/emulated/0/Documents/Travail"),
