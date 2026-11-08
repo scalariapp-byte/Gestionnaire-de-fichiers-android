@@ -38,6 +38,9 @@ import com.scalari.fichiers.ui.analyzer.AnalyzerContent
 import com.scalari.fichiers.ui.analyzer.BootAppsContent
 import com.scalari.fichiers.ui.analyzer.UsageSlice
 import com.scalari.fichiers.ui.player.AudioPlayerContent
+import com.scalari.fichiers.ui.player.FitMode
+import com.scalari.fichiers.ui.player.VideoControls
+import androidx.compose.foundation.background
 import com.scalari.fichiers.ui.player.MiniPlayer
 import com.scalari.fichiers.ui.player.PlayerUiState
 import com.scalari.fichiers.ui.Tab
@@ -268,6 +271,22 @@ class ScreenshotTest {
             ),
             showSystem = false, onToggleSystem = {}, onSelect = {},
         )
+    }
+
+    @Test fun video_controls() = capture("16_lecteur_video", mode = ThemeMode.DARK) {
+        androidx.compose.foundation.layout.Box(
+            Modifier
+                .fillMaxSize()
+                .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(
+                    androidx.compose.ui.graphics.Color(0xFF203A43), androidx.compose.ui.graphics.Color(0xFF2C5364),
+                )))
+        ) {
+            VideoControls(
+                visible = true, title = "Vacances en Bretagne 2026.mp4", isPlaying = true,
+                position = 754_000, duration = 2_712_000, speed = 1.25f, fit = FitMode.FIT,
+                hasPrev = true, hasNext = true, hasSubtitles = true, hasAudioChoice = true,
+            )
+        }
     }
 
     @Test fun settings() = capture("08_parametres") { SettingsScreen(onBack = {}) }

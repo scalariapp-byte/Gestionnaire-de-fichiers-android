@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -48,10 +49,40 @@ class PlaybackService : MediaSessionService() {
                     controller: MediaSession.ControllerInfo,
                     mediaItems: MutableList<MediaItem>,
                 ): ListenableFuture<MutableList<MediaItem>> = Futures.immediateFuture(
-                    mediaItems.map { it.buildUpon().setUri(Uri.fromFile(File(it.mediaId))).build() }.toMutableList()
+                    mediaItems.map { item ->
+                        val file = File(item.mediaId)
+                        item.buildUpon()
+                            .setUri(Uri.fromFile(file))
+                            .setSubtitleConfigurations(externalSubtitles(file))
+                            .build()
+                    }.toMutableList()
                 )
             })
             .build()
+    }
+
+    /** Sous-titres posés à côté de la vidéo avec le même nom (film.srt, film.fr.srt, film.vtt…). */
+    private fun externalSubtitles(video: File): List<MediaItem.SubtitleConfiguration> {
+        val dir = video.parentFile ?: return emptyList()
+        val base = video.nameWithoutExtension
+        val files = dir.listFiles { f ->
+            f.isFile && f.name.startsWith(base) && f.extension.lowercase() in setOf("srt", "vtt", "ass", "ssa")
+        }.orEmpty().sortedBy { it.name.length }
+        return files.mapIndexed { i, f ->
+            val mime = when (f.extension.lowercase()) {
+                "srt" -> MimeTypes.APPLICATION_SUBRIP
+                "vtt" -> MimeTypes.TEXT_VTT
+                else -> MimeTypes.TEXT_SSA
+            }
+            // « film.fr.srt » → langue « fr ».
+            val lang = f.nameWithoutExtension.removePrefix(base).trim('.', '_', '-', ' ').takeIf { it.length in 2..3 }
+            MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(f))
+                .setMimeType(mime)
+                .setLanguage(lang)
+                .setLabel(f.name)
+                .setSelectionFlags(if (i == 0) C.SELECTION_FLAG_DEFAULT else 0)
+                .build()
+        }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

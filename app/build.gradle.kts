@@ -13,8 +13,8 @@ android {
         applicationId = "com.scalari.fichiers"
         minSdk = 26
         targetSdk = 35
-        versionCode = 12
-        versionName = "1.8.1"
+        versionCode = 13
+        versionName = "1.9.0"
     }
 
     // Clé de signature fixe : chaque version s'installe par-dessus la précédente.

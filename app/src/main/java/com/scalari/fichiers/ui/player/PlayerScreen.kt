@@ -96,6 +96,7 @@ fun PlayerScreen(path: String, onBack: () -> Unit, secure: Boolean = false) {
     val state = rememberPlayerState(controller)
     val requestedType = remember(path) { if (path.isEmpty()) null else FileTypes.of(File(path).name, false) }
     var started by rememberSaveable(path) { mutableStateOf(path.isEmpty()) }
+    var resumeFrom by rememberSaveable(path) { mutableStateOf(0L) }
 
     // Notifications (Android 13+) : nécessaires pour les commandes de lecture en arrière-plan.
     val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -117,7 +118,9 @@ fun PlayerScreen(path: String, onBack: () -> Unit, secure: Boolean = false) {
                 ?: emptyList()
         }.ifEmpty { listOf(file) }
         val start = playlist.indexOfFirst { it.absolutePath == file.absolutePath }.coerceAtLeast(0)
-        c.setMediaItems(playlist.map { PlayerConnection.mediaItem(it, if (secure) "Contenu protégé" else null) }, start, 0L)
+        // Vidéo déjà commencée : reprise là où elle avait été interrompue.
+        resumeFrom = if (!secure && requestedType == FileType.VIDEO) ResumeStore.get(context, file.absolutePath) else 0L
+        c.setMediaItems(playlist.map { PlayerConnection.mediaItem(it, if (secure) "Contenu protégé" else null) }, start, resumeFrom)
         c.prepare()
         c.play()
         started = true
@@ -129,7 +132,7 @@ fun PlayerScreen(path: String, onBack: () -> Unit, secure: Boolean = false) {
             CircularProgressIndicator()
         }
     } else if (isVideo) {
-        VideoPlayer(controller!!, state.title, onBack)
+        VideoPlayer(controller!!, state.title, onBack, resumeFrom = resumeFrom, allowPip = !secure)
     } else {
         AudioPlayerContent(
             state = state,
@@ -149,62 +152,6 @@ fun PlayerScreen(path: String, onBack: () -> Unit, secure: Boolean = false) {
                 }
             },
         )
-    }
-}
-
-@Composable
-private fun VideoPlayer(player: Player, title: String, onBack: () -> Unit) {
-    val view = LocalView.current
-    val activity = LocalContext.current.findActivity()
-    // Plein écran immersif ; la vidéo se met en pause en quittant l'écran (pas lors d'une rotation).
-    DisposableEffect(Unit) {
-        val window = activity?.window
-        val insets = window?.let { WindowCompat.getInsetsController(it, view) }
-        insets?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        insets?.hide(WindowInsetsCompat.Type.systemBars())
-        onDispose {
-            insets?.show(WindowInsetsCompat.Type.systemBars())
-            if (activity?.isChangingConfigurations != true) player.pause()
-        }
-    }
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
-        AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-                    keepScreenOn = true
-                    this.player = player
-                }
-            },
-            update = { it.player = player },
-            onRelease = { it.player = null },
-            modifier = Modifier.fillMaxSize(),
-        )
-        Row(
-            Modifier
-                .statusBarsPadding()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(shape = MaterialTheme.shapes.extraLarge, color = Color.Black.copy(alpha = 0.45f)) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour", tint = Color.White)
-                }
-            }
-            Text(
-                title,
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                modifier = Modifier
-                    .padding(start = 12.dp)
-                    .basicMarquee(),
-            )
-        }
     }
 }
 
