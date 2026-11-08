@@ -109,7 +109,7 @@ dependencies {
     // Moteur FFmpeg (audio) : AC3/E-AC3, DTS, TrueHD… quand le téléphone ne sait pas les décoder.
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.5.0+1")
     // Moteur VLC : vidéos que le téléphone ne sait pas décoder (WMV, MPEG-2, vieux DivX…).
-    implementation("org.videolan.android:libvlc-all:3.7.7")
+    implementation("org.videolan.android:libvlc-all:3.7.2")
     // Vérification quotidienne des mises à jour.
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("com.google.guava:guava:33.3.1-android")

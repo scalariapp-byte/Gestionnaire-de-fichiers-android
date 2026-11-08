@@ -1,0 +1,40 @@
+name: Renommer les anciennes releases
+
+# Lancement manuel : renomme « Fichiers vX » en « Gestionnaire de fichiers vX »
+# (titre, fichiers APK et texte de la release).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  renommer:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Renommer titres, APK et descriptions
+        run: |
+          set -euo pipefail
+          gh api "repos/$GH_REPO/releases?per_page=100" --paginate --jq '.[] | @base64' | while read -r row; do
+            rel=$(echo "$row" | base64 -d)
+            id=$(echo "$rel" | jq -r .id)
+            tag=$(echo "$rel" | jq -r .tag_name)
+            name=$(echo "$rel" | jq -r .name)
+            body=$(echo "$rel" | jq -r '.body // ""')
+            if [[ "$name" == Fichiers\ v* ]]; then
+              newbody=$(printf '%s' "$body" | sed 's/Fichiers-v/Gestionnaire-de-fichiers-v/g')
+              jq -n --arg n "Gestionnaire de fichiers $tag" --arg b "$newbody" '{name:$n, body:$b}' \
+                | gh api -X PATCH "repos/$GH_REPO/releases/$id" --input - > /dev/null
+              echo "Titre : $name → Gestionnaire de fichiers $tag"
+            fi
+            echo "$rel" | jq -r '.assets[] | "\(.id) \(.name)"' | while read -r aid aname; do
+              if [[ "$aname" == Fichiers-* ]]; then
+                new="Gestionnaire-de-fichiers-${aname#Fichiers-}"
+                gh api -X PATCH "repos/$GH_REPO/releases/assets/$aid" -f name="$new" > /dev/null
+                echo "  Fichier : $aname → $new"
+              fi
+            done
+          done
