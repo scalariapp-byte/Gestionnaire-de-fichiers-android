@@ -134,6 +134,7 @@ class HomeActions(
     val onVault: () -> Unit = {},
     val onTrash: () -> Unit = {},
     val onAnalyze: () -> Unit = {},
+    val onAnalyzeRoot: (String) -> Unit = {},
     val onInstallUpdate: (com.scalari.fichiers.update.Release) -> Unit = {},
     val onDismissUpdate: () -> Unit = {},
 )
@@ -164,7 +165,8 @@ fun HomeScreen(navigator: AppNavigator) {
         },
         onVault = navigator::vault,
         onTrash = navigator::trash,
-        onAnalyze = navigator::analyzer,
+        onAnalyze = { navigator.analyzer() },
+        onAnalyzeRoot = { navigator.analyzer(it) },
         onInstallUpdate = { r -> scope.launch { com.scalari.fichiers.update.UpdateManager.downloadAndInstall(context, r) } },
         onDismissUpdate = { com.scalari.fichiers.update.UpdateManager.dismiss(context) },
     )
@@ -206,7 +208,7 @@ fun HomeContent(
         UpdateBanner(update, actions)
 
         val primary = roots.firstOrNull { it.isPrimary } ?: roots.firstOrNull()
-        if (primary != null) StorageCompact(primary, others = roots - primary, onOpen = actions.onOpenPath, onAnalyze = actions.onAnalyze)
+        if (primary != null) StorageCompact(primary, others = roots - primary, onOpen = actions.onOpenPath, onAnalyze = actions.onAnalyze, onAnalyzeRoot = actions.onAnalyzeRoot)
 
         SectionTitle("Catégories")
         Column(Modifier.padding(horizontal = 12.dp)) {
@@ -271,7 +273,13 @@ private fun Header(actions: HomeActions) {
 }
 
 @Composable
-private fun StorageCompact(root: StorageRoot, others: List<StorageRoot>, onOpen: (String) -> Unit, onAnalyze: () -> Unit) {
+private fun StorageCompact(
+    root: StorageRoot,
+    others: List<StorageRoot>,
+    onOpen: (String) -> Unit,
+    onAnalyze: () -> Unit,
+    onAnalyzeRoot: (String) -> Unit = {},
+) {
     val fraction = percent(root)
     Column(
         Modifier
@@ -345,6 +353,17 @@ private fun StorageCompact(root: StorageRoot, others: List<StorageRoot>, onOpen:
                         .weight(1f),
                 )
                 Text("${formatSize(other.free)} libres", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f))
+                Icon(
+                    Icons.Filled.PieChart,
+                    "Analyser ${other.name}",
+                    tint = Color.White,
+                    modifier = Modifier
+                        .padding(start = 10.dp)
+                        .clip(CircleShape)
+                        .clickable { onAnalyzeRoot(other.path.absolutePath) }
+                        .padding(4.dp)
+                        .size(20.dp),
+                )
             }
         }
     }

@@ -96,7 +96,7 @@ object MediaQueries {
 
     /** Nombre de fichiers et taille totale d'une catégorie (sans vérifier l'existence : rapide). */
     @Suppress("DEPRECATION")
-    suspend fun stat(context: Context, category: Category, showHidden: Boolean): Stat = withContext(Dispatchers.IO) {
+    suspend fun stat(context: Context, category: Category, showHidden: Boolean, rootPrefix: String? = null): Stat = withContext(Dispatchers.IO) {
         val data = MediaStore.MediaColumns.DATA
         val size = MediaStore.MediaColumns.SIZE
         val (selection, args) = selectionFor(category)
@@ -112,6 +112,7 @@ object MediaQueries {
                     val path = c.getString(iData) ?: continue
                     if (path.contains("/${TrashManager.TRASH_DIR}/") || path.contains("/${VaultManager.DIR_NAME}/")) continue
                     if (!showHidden && path.contains("/.")) continue
+                    if (rootPrefix != null && !path.startsWith(rootPrefix)) continue
                     count++
                     bytes += c.getLong(iSize)
                 }

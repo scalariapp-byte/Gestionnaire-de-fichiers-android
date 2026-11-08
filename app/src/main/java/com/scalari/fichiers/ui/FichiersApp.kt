@@ -74,11 +74,11 @@ object Routes {
     const val IMAGE = "image?path={path}&secure={secure}"
     const val VAULT = "vault"
     const val TAB_FILES = "files"
-    const val ANALYZER = "analyzer"
+    const val ANALYZER = "analyzer?root={root}"
     const val ANALYZER_FOLDERS = "analyzer/folders?path={path}"
-    const val ANALYZER_DUPLICATES = "analyzer/duplicates"
+    const val ANALYZER_DUPLICATES = "analyzer/duplicates?root={root}"
     const val ANALYZER_APKS = "analyzer/apks"
-    const val ANALYZER_EMPTY = "analyzer/empty"
+    const val ANALYZER_EMPTY = "analyzer/empty?root={root}"
     const val BOOT_APPS = "boot-apps"
     const val PLAYER = "player?path={path}&secure={secure}"
     fun player(path: String, secure: Boolean = false) = "player?path=${Uri.encode(path)}&secure=$secure"
@@ -117,11 +117,11 @@ class AppNavigator(private val nav: NavHostController) {
     fun text(path: String) = nav.navigate(Routes.text(path))
     fun image(path: String, secure: Boolean = false) = nav.navigate(Routes.image(path, secure))
     fun vault() = tab(Tab.VAULT)
-    fun analyzer() = nav.navigate(Routes.ANALYZER)
+    fun analyzer(root: String? = null) = nav.navigate("analyzer?root=${Uri.encode(root ?: "")}")
     fun analyzerFolders(path: String?) = nav.navigate("analyzer/folders?path=${Uri.encode(path ?: "")}")
-    fun analyzerDuplicates() = nav.navigate(Routes.ANALYZER_DUPLICATES)
+    fun analyzerDuplicates(root: String) = nav.navigate("analyzer/duplicates?root=${Uri.encode(root)}")
     fun analyzerApks() = nav.navigate(Routes.ANALYZER_APKS)
-    fun analyzerEmpty() = nav.navigate(Routes.ANALYZER_EMPTY)
+    fun analyzerEmpty(root: String) = nav.navigate("analyzer/empty?root=${Uri.encode(root)}")
     fun bootApps() = nav.navigate(Routes.BOOT_APPS)
     fun player(path: String, secure: Boolean = false) = nav.navigate(Routes.player(path, secure)) { launchSingleTop = true }
 
@@ -284,13 +284,19 @@ private fun AppNavHost() {
                 secure = e.arguments?.getBoolean("secure") ?: false,
             )
         }
-        composable(Routes.ANALYZER) { AnalyzerScreen(navigator) }
+        composable(Routes.ANALYZER, arguments = listOf(navArgument("root") { type = NavType.StringType; nullable = true; defaultValue = null })) { e ->
+            AnalyzerScreen(navigator, e.arguments?.getString("root")?.takeIf { it.isNotEmpty() })
+        }
         composable(Routes.ANALYZER_FOLDERS, arguments = listOf(pathArg)) { e ->
             FolderSizesScreen(e.arguments?.getString("path")?.takeIf { it.isNotEmpty() }, navigator)
         }
-        composable(Routes.ANALYZER_DUPLICATES) { DuplicatesScreen(navigator) }
+        composable(Routes.ANALYZER_DUPLICATES, arguments = listOf(navArgument("root") { type = NavType.StringType; nullable = true; defaultValue = null })) { e ->
+            DuplicatesScreen(navigator, e.arguments?.getString("root").orEmpty())
+        }
         composable(Routes.ANALYZER_APKS) { InstalledApksScreen(navigator) }
-        composable(Routes.ANALYZER_EMPTY) { EmptyFoldersScreen(navigator) }
+        composable(Routes.ANALYZER_EMPTY, arguments = listOf(navArgument("root") { type = NavType.StringType; nullable = true; defaultValue = null })) { e ->
+            EmptyFoldersScreen(navigator, e.arguments?.getString("root").orEmpty())
+        }
         composable(Routes.BOOT_APPS) { com.scalari.fichiers.ui.analyzer.BootAppsScreen(onBack = navigator::back) }
         composable(Routes.TRASH) {
             TrashScreen(onBack = navigator::back)

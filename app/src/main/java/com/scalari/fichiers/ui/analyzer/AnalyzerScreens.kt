@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.SdCard
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.Button
@@ -110,14 +112,21 @@ private fun AnalyzerScaffold(title: String, subtitle: String? = null, onBack: ()
 }
 
 @Composable
-fun AnalyzerScreen(navigator: AppNavigator) {
+fun AnalyzerScreen(navigator: AppNavigator, initialRoot: String? = null) {
     val context = LocalContext.current
     val showHidden = FileManagerApp.instance.settingsState.collectAsStateWithLifecycle().value.showHidden
-    var root by remember { mutableStateOf<StorageRoot?>(null) }
+    var roots by remember { mutableStateOf<List<StorageRoot>>(emptyList()) }
+    var selectedPath by remember { mutableStateOf(initialRoot) }
     var slices by remember { mutableStateOf<List<UsageSlice>>(emptyList()) }
     LaunchedEffect(Unit) {
-        val r = withContext(Dispatchers.IO) { StorageRoots.list(context).firstOrNull { it.isPrimary } }
-        root = r
+        roots = withContext(Dispatchers.IO) { StorageRoots.list(context) }
+        if (selectedPath == null) selectedPath = roots.firstOrNull { it.isPrimary }?.path?.absolutePath ?: roots.firstOrNull()?.path?.absolutePath
+    }
+    val root = roots.firstOrNull { it.path.absolutePath == selectedPath }
+    // Répartition par type, propre au stockage choisi.
+    LaunchedEffect(root) {
+        val r = root ?: return@LaunchedEffect
+        slices = emptyList()
         val cats = listOf(
             Triple(Category.IMAGES, "Images", Color(0xFF2E9E5B)),
             Triple(Category.VIDEOS, "Vidéos", Color(0xFFE5484D)),
@@ -126,22 +135,46 @@ fun AnalyzerScreen(navigator: AppNavigator) {
             Triple(Category.APKS, "APK", Color(0xFF5BA33B)),
             Triple(Category.ARCHIVES, "Archives", Color(0xFFB0793F)),
         )
-        val list = cats.map { (c, label, color) -> UsageSlice(label, MediaQueries.stat(context, c, showHidden).bytes, color) }
+        val prefix = r.path.absolutePath + "/"
+        val list = cats.map { (c, label, color) -> UsageSlice(label, MediaQueries.stat(context, c, showHidden, prefix).bytes, color) }
         val known = list.sumOf { it.bytes }
-        slices = list + UsageSlice("Système et autres", ((r?.used ?: 0) - known).coerceAtLeast(0), Color(0xFF9AA0AE))
+        slices = list + UsageSlice(if (r.isPrimary) "Système et autres" else "Autres", (r.used - known).coerceAtLeast(0), Color(0xFF9AA0AE))
     }
     AnalyzerScaffold("Analyse du stockage", onBack = navigator::back) { padding ->
-        AnalyzerContent(
-            root = root,
-            slices = slices,
-            modifier = Modifier.padding(padding),
-            onFolders = { navigator.analyzerFolders(root?.path?.absolutePath) },
-            onDuplicates = navigator::analyzerDuplicates,
-            onApks = navigator::analyzerApks,
-            onEmpty = navigator::analyzerEmpty,
-            onLarge = { navigator.category(Category.LARGE) },
-            onBootApps = navigator::bootApps,
-        )
+        Column(Modifier.padding(padding)) {
+            if (roots.size > 1) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    roots.forEach { r ->
+                        androidx.compose.material3.FilterChip(
+                            selected = r.path.absolutePath == selectedPath,
+                            onClick = { selectedPath = r.path.absolutePath },
+                            leadingIcon = {
+                                Icon(
+                                    if (r.isPrimary) Icons.Filled.Smartphone else Icons.Filled.SdCard,
+                                    null, Modifier.size(18.dp),
+                                )
+                            },
+                            label = { Text(r.name, maxLines = 1) },
+                        )
+                    }
+                }
+            }
+            AnalyzerContent(
+                root = root,
+                slices = slices,
+                onFolders = { navigator.analyzerFolders(root?.path?.absolutePath) },
+                onDuplicates = { root?.let { navigator.analyzerDuplicates(it.path.absolutePath) } },
+                onApks = navigator::analyzerApks,
+                onEmpty = { root?.let { navigator.analyzerEmpty(it.path.absolutePath) } },
+                onLarge = { navigator.category(Category.LARGE) },
+                onBootApps = navigator::bootApps,
+            )
+        }
     }
 }
 
@@ -477,7 +510,8 @@ private fun CleanupScreen(
 }
 
 @Composable
-fun DuplicatesScreen(navigator: AppNavigator) {
+fun DuplicatesScreen(navigator: AppNavigator, rootPath: String) {
+    val scanRoot = remember(rootPath) { rootPath.takeIf { it.isNotEmpty() }?.let(::File) ?: StorageRoots.primary() }
     val context = LocalContext.current
     val showHidden = FileManagerApp.instance.settingsState.value.showHidden
     CleanupScreen(
@@ -485,7 +519,7 @@ fun DuplicatesScreen(navigator: AppNavigator) {
         navigator = navigator,
         emptyText = "Aucun doublon trouvé (fichiers de plus de 100 Ko).",
         load = { onProgress ->
-            val groups: List<DuplicateGroup> = StorageAnalyzer.duplicates(context, StorageRoots.primary(), showHidden) { step, done, total ->
+            val groups: List<DuplicateGroup> = StorageAnalyzer.duplicates(context, scanRoot, showHidden) { step, done, total ->
                 onProgress(if (total > 0) "$step… $done / $total" else if (done > 0) "$step… $done fichiers" else "$step…")
             }
             val items = groups.flatMapIndexed { gi, g ->
@@ -527,7 +561,8 @@ fun InstalledApksScreen(navigator: AppNavigator) {
 }
 
 @Composable
-fun EmptyFoldersScreen(navigator: AppNavigator) {
+fun EmptyFoldersScreen(navigator: AppNavigator, rootPath: String) {
+    val scanRoot = remember(rootPath) { rootPath.takeIf { it.isNotEmpty() }?.let(::File) ?: StorageRoots.primary() }
     val showHidden = FileManagerApp.instance.settingsState.value.showHidden
     CleanupScreen(
         title = "Dossiers vides",
@@ -535,8 +570,8 @@ fun EmptyFoldersScreen(navigator: AppNavigator) {
         emptyText = "Aucun dossier vide.",
         load = { onProgress ->
             onProgress("Recherche des dossiers vides…")
-            val dirs = StorageAnalyzer.emptyFolders(StorageRoots.primary(), showHidden)
-            val root = StorageRoots.primary().absolutePath
+            val dirs = StorageAnalyzer.emptyFolders(scanRoot, showHidden)
+            val root = scanRoot.absolutePath
             val items = dirs.map { CleanupItem(it, it.name, it.parent?.removePrefix(root)?.ifEmpty { "/" } ?: "", 0) }
             items to items.mapTo(HashSet()) { it.file.absolutePath }
         },
