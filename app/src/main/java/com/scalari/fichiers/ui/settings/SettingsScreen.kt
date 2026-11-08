@@ -100,6 +100,30 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
 
             }
+            Group("Partager l'application") {
+                var qr by remember { mutableStateOf(false) }
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable { ShareApp.share(context) },
+                    headlineContent = { Text("Envoyer le lien de téléchargement") },
+                    supportingContent = { Text(APP_DOWNLOAD_URL.removePrefix("https://"), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+                )
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable {
+                        ShareApp.copy(context)
+                        android.widget.Toast.makeText(context, "Lien copié", android.widget.Toast.LENGTH_SHORT).show()
+                    },
+                    headlineContent = { Text("Copier le lien") },
+                )
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier.clickable { qr = true },
+                    headlineContent = { Text("Afficher le QR code") },
+                    supportingContent = { Text("À scanner avec un autre téléphone") },
+                )
+                if (qr) QrCodeDialog(onDismiss = { qr = false })
+            }
             Group("Mises à jour") {
                 val update by com.scalari.fichiers.update.UpdateManager.state.collectAsStateWithLifecycle()
                 var auto by remember { mutableStateOf(com.scalari.fichiers.update.UpdateManager.isAutoCheckEnabled(context)) }

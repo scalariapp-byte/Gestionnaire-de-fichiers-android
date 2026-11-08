@@ -7,9 +7,6 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -17,62 +14,115 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.scalari.fichiers.R
 import com.scalari.fichiers.data.AppSettings
 import com.scalari.fichiers.data.ThemeMode
 
+/** Inter : police d'interface (licence SIL OFL 1.1). */
+val Inter = FontFamily(
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+    Font(R.font.inter_bold, FontWeight.Bold),
+)
+
+// Palette sobre : gris ardoise neutres, un seul bleu d'accent.
 private val LightColors = lightColorScheme(
-    primary = Color(0xFF1B5EBF),
+    primary = Color(0xFF2F5BEA),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD8E2FF),
-    onPrimaryContainer = Color(0xFF001A41),
-    secondary = Color(0xFF565E71),
-    secondaryContainer = Color(0xFFDAE2F9),
-    tertiary = Color(0xFF6A4FD8),
-    tertiaryContainer = Color(0xFFE6DEFF),
-    background = Color(0xFFF8F9FF),
-    surface = Color(0xFFF8F9FF),
+    primaryContainer = Color(0xFFE4EAFF),
+    onPrimaryContainer = Color(0xFF0B1F66),
+    secondary = Color(0xFF475467),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFEEF1F6),
+    onSecondaryContainer = Color(0xFF1D2939),
+    tertiary = Color(0xFF0E7C86),
+    tertiaryContainer = Color(0xFFD7F3F5),
+    onTertiaryContainer = Color(0xFF053B40),
+    error = Color(0xFFD92D20),
+    background = Color(0xFFFCFCFD),
+    onBackground = Color(0xFF101828),
+    surface = Color(0xFFFCFCFD),
+    onSurface = Color(0xFF101828),
+    surfaceVariant = Color(0xFFF2F4F7),
+    onSurfaceVariant = Color(0xFF667085),
     surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF1F3FC),
-    surfaceContainer = Color(0xFFEBEEF8),
-    surfaceContainerHigh = Color(0xFFE5E8F3),
-    surfaceContainerHighest = Color(0xFFDFE2ED),
+    surfaceContainerLow = Color(0xFFF8F9FB),
+    surfaceContainer = Color(0xFFF2F4F7),
+    surfaceContainerHigh = Color(0xFFEAECF0),
+    surfaceContainerHighest = Color(0xFFE4E7EC),
+    outline = Color(0xFFD0D5DD),
+    outlineVariant = Color(0xFFEAECF0),
+    inverseSurface = Color(0xFF1D2939),
+    inverseOnSurface = Color(0xFFF2F4F7),
+    inversePrimary = Color(0xFF9DB4FF),
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFFADC6FF),
-    onPrimary = Color(0xFF002E69),
-    primaryContainer = Color(0xFF004494),
-    onPrimaryContainer = Color(0xFFD8E2FF),
-    secondary = Color(0xFFBEC6DC),
-    secondaryContainer = Color(0xFF3E4759),
-    tertiary = Color(0xFFCABEFF),
-    tertiaryContainer = Color(0xFF4A35B0),
-    background = Color(0xFF0F1218),
-    surface = Color(0xFF0F1218),
-    surfaceContainerLowest = Color(0xFF0A0D12),
-    surfaceContainerLow = Color(0xFF171A21),
-    surfaceContainer = Color(0xFF1B1F26),
-    surfaceContainerHigh = Color(0xFF252931),
-    surfaceContainerHighest = Color(0xFF30343C),
+    primary = Color(0xFF8DA8FF),
+    onPrimary = Color(0xFF0B1F66),
+    primaryContainer = Color(0xFF233670),
+    onPrimaryContainer = Color(0xFFDCE4FF),
+    secondary = Color(0xFF98A2B3),
+    onSecondary = Color(0xFF101828),
+    secondaryContainer = Color(0xFF232A37),
+    onSecondaryContainer = Color(0xFFE4E7EC),
+    tertiary = Color(0xFF5FD0D9),
+    tertiaryContainer = Color(0xFF0B4A50),
+    onTertiaryContainer = Color(0xFFD7F3F5),
+    error = Color(0xFFF97066),
+    background = Color(0xFF0C111D),
+    onBackground = Color(0xFFF2F4F7),
+    surface = Color(0xFF0C111D),
+    onSurface = Color(0xFFF2F4F7),
+    surfaceVariant = Color(0xFF1D2433),
+    onSurfaceVariant = Color(0xFF98A2B3),
+    surfaceContainerLowest = Color(0xFF080B14),
+    surfaceContainerLow = Color(0xFF121826),
+    surfaceContainer = Color(0xFF161C2A),
+    surfaceContainerHigh = Color(0xFF1D2433),
+    surfaceContainerHighest = Color(0xFF262E3F),
+    outline = Color(0xFF344054),
+    outlineVariant = Color(0xFF1F2737),
+    inverseSurface = Color(0xFFF2F4F7),
+    inverseOnSurface = Color(0xFF1D2939),
+    inversePrimary = Color(0xFF2F5BEA),
 )
 
 private val AppShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(32.dp),
+    extraSmall = RoundedCornerShape(6.dp),
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(14.dp),
+    large = RoundedCornerShape(18.dp),
+    extraLarge = RoundedCornerShape(26.dp),
 )
 
+private fun TextStyle.inter(weight: FontWeight, spacing: Float? = null) =
+    copy(fontFamily = Inter, fontWeight = weight, letterSpacing = spacing?.sp ?: letterSpacing)
+
 private val AppTypography = Typography().let { t ->
-    t.copy(
-        headlineLarge = t.headlineLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp),
-        headlineMedium = t.headlineMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.25).sp),
-        headlineSmall = t.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
-        titleLarge = t.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-        titleMedium = t.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-        titleSmall = t.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-        labelLarge = t.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+    Typography(
+        displayLarge = t.displayLarge.inter(FontWeight.SemiBold, -1f),
+        displayMedium = t.displayMedium.inter(FontWeight.SemiBold, -0.8f),
+        displaySmall = t.displaySmall.inter(FontWeight.SemiBold, -0.5f),
+        headlineLarge = t.headlineLarge.inter(FontWeight.SemiBold, -0.6f),
+        headlineMedium = t.headlineMedium.inter(FontWeight.SemiBold, -0.4f),
+        headlineSmall = t.headlineSmall.inter(FontWeight.SemiBold, -0.3f),
+        titleLarge = t.titleLarge.inter(FontWeight.SemiBold, -0.2f),
+        titleMedium = t.titleMedium.inter(FontWeight.SemiBold, -0.1f),
+        titleSmall = t.titleSmall.inter(FontWeight.SemiBold, 0f),
+        bodyLarge = t.bodyLarge.inter(FontWeight.Normal, 0f),
+        bodyMedium = t.bodyMedium.inter(FontWeight.Normal, 0f),
+        bodySmall = t.bodySmall.inter(FontWeight.Normal, 0.1f),
+        labelLarge = t.labelLarge.inter(FontWeight.Medium, 0f),
+        labelMedium = t.labelMedium.inter(FontWeight.Medium, 0.2f),
+        labelSmall = t.labelSmall.inter(FontWeight.Medium, 0.3f),
     )
 }
 
@@ -91,6 +141,7 @@ private fun ColorScheme.toPureBlack(): ColorScheme = copy(
     surfaceContainerHigh = Color(0xFF18181B),
     surfaceContainerHighest = Color(0xFF222226),
     surfaceVariant = Color(0xFF1A1A1D),
+    outlineVariant = Color(0xFF1C1C20),
     inverseSurface = Color(0xFFE6E6EA),
 )
 

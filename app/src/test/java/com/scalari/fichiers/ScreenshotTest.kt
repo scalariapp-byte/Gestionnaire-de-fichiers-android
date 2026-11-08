@@ -290,4 +290,5 @@ class ScreenshotTest {
     }
 
     @Test fun settings() = capture("08_parametres") { SettingsScreen(onBack = {}) }
+    @Test fun share_qr() = capture("17_partage_qr") { com.scalari.fichiers.ui.settings.QrCodeDialog(onDismiss = {}) }
 }

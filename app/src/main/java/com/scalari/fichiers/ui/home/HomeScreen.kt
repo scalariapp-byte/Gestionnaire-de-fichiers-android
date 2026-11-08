@@ -7,6 +7,14 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PieChart
+import androidx.compose.material.icons.outlined.SdCard
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Usb
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -257,26 +265,22 @@ private fun Header(actions: HomeActions) {
         Modifier
             .fillMaxWidth()
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(start = 20.dp, end = 4.dp, top = 6.dp, bottom = 2.dp),
+            .padding(start = 20.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(32.dp))
+        Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(30.dp))
         Text(
             "Mes fichiers",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.titleLarge,
             modifier = Modifier
-                .padding(start = 10.dp)
+                .padding(start = 12.dp)
                 .weight(1f),
         )
-        IconButton(onClick = actions.onSearch) { Icon(Icons.Filled.Search, "Rechercher") }
-        IconButton(onClick = actions.onTrash) { Icon(Icons.Filled.Delete, "Corbeille") }
-        IconButton(onClick = actions.onSettings) { Icon(Icons.Filled.Settings, "Paramètres") }
+        IconButton(onClick = actions.onSearch) { Icon(Icons.Outlined.Search, "Rechercher") }
+        IconButton(onClick = actions.onTrash) { Icon(Icons.Outlined.Delete, "Corbeille") }
+        IconButton(onClick = actions.onSettings) { Icon(Icons.Outlined.Settings, "Paramètres") }
     }
 }
-
 @Composable
 private fun StorageCompact(
     root: StorageRoot,
@@ -285,95 +289,90 @@ private fun StorageCompact(
     onAnalyze: () -> Unit,
     onAnalyzeRoot: (String) -> Unit = {},
 ) {
+    val scheme = MaterialTheme.colorScheme
     val fraction = percent(root)
-    Column(
-        Modifier
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = scheme.surfaceContainerLowest,
+        border = androidx.compose.foundation.BorderStroke(1.dp, scheme.outlineVariant),
+        modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp)
-            .clip(MaterialTheme.shapes.large)
-            .background(Brush.linearGradient(listOf(Color(0xFF6A4CFF), Color(0xFF1FA8DC)))),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
     ) {
-        Row(
-            Modifier
-                .clickable { onOpen(root.path.absolutePath) }
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                UsageRing(
-                    fraction,
-                    track = Color.White.copy(alpha = 0.22f),
-                    progress = if (fraction > 0.9f) Color(0xFFFFB4AB) else Color.White,
-                    modifier = Modifier.size(58.dp),
-                )
-                Text("${(fraction * 100).toInt()}%", style = MaterialTheme.typography.labelLarge, color = Color.White)
-            }
-            Column(
-                Modifier
-                    .padding(start = 16.dp)
-                    .weight(1f)
-            ) {
-                Text(root.name, style = MaterialTheme.typography.titleMedium, color = Color.White)
-                Text(
-                    "${formatSize(root.used)} sur ${formatSize(root.total)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.85f),
-                )
-                Text(
-                    "${formatSize(root.free)} libres",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.75f),
-                )
-            }
-            Surface(onClick = onAnalyze, shape = CircleShape, color = Color.White.copy(alpha = 0.2f)) {
-                Row(Modifier.padding(horizontal = 12.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.PieChart, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                    Text(
-                        "Analyser",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Color.White,
-                        modifier = Modifier.padding(start = 6.dp),
-                    )
-                }
-            }
-        }
-        others.forEach { other ->
+        Column {
             Row(
                 Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpen(other.path.absolutePath) }
-                    .background(Color.Black.copy(alpha = 0.12f))
-                    .padding(horizontal = 18.dp, vertical = 10.dp),
+                    .clickable { onOpen(root.path.absolutePath) }
+                    .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(if (other.isRemovable) Icons.Filled.SdCard else Icons.Filled.Usb, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Text(
-                    other.name,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .padding(start = 10.dp)
-                        .weight(1f),
-                )
-                Text("${formatSize(other.free)} libres", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.85f))
-                Icon(
-                    Icons.Filled.PieChart,
-                    "Analyser ${other.name}",
-                    tint = Color.White,
-                    modifier = Modifier
-                        .padding(start = 10.dp)
-                        .clip(CircleShape)
-                        .clickable { onAnalyzeRoot(other.path.absolutePath) }
-                        .padding(4.dp)
-                        .size(20.dp),
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    UsageRing(
+                        fraction,
+                        track = scheme.surfaceContainerHigh,
+                        progress = if (fraction > 0.9f) scheme.error else scheme.primary,
+                        modifier = Modifier.size(56.dp),
+                    )
+                    Text("${(fraction * 100).toInt()}%", style = MaterialTheme.typography.labelLarge)
+                }
+                Column(
+                    Modifier
+                        .padding(start = 16.dp)
+                        .weight(1f)
+                ) {
+                    Text(root.name, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${formatSize(root.used)} sur ${formatSize(root.total)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = scheme.onSurfaceVariant,
+                    )
+                    Text(
+                        "${formatSize(root.free)} libres",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
+                androidx.compose.material3.OutlinedButton(
+                    onClick = onAnalyze,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                ) {
+                    Icon(Icons.Outlined.PieChart, null, modifier = Modifier.size(16.dp))
+                    Text("Analyser", modifier = Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            others.forEach { other ->
+                androidx.compose.material3.HorizontalDivider(color = scheme.outlineVariant)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpen(other.path.absolutePath) }
+                        .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        if (other.isRemovable) Icons.Outlined.SdCard else Icons.Outlined.Usb, null,
+                        tint = scheme.onSurfaceVariant, modifier = Modifier.size(20.dp),
+                    )
+                    Column(
+                        Modifier
+                            .padding(start = 14.dp)
+                            .weight(1f)
+                    ) {
+                        Text(other.name, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            "${formatSize(other.free)} libres sur ${formatSize(other.total)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = scheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = { onAnalyzeRoot(other.path.absolutePath) }) {
+                        Icon(Icons.Outlined.PieChart, "Analyser ${other.name}", tint = scheme.onSurfaceVariant)
+                    }
+                }
             }
         }
     }
 }
-
 @Composable
 private fun UsageRing(fraction: Float, track: Color, progress: Color, modifier: Modifier = Modifier) {
     Canvas(modifier) {
@@ -395,10 +394,15 @@ private fun SectionTitle(text: String, action: String? = null, onAction: () -> U
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 8.dp, top = 14.dp, bottom = 6.dp),
+            .padding(start = 20.dp, end = 8.dp, top = 18.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        Text(
+            text.uppercase(),
+            style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
         if (action != null) {
             Text(
                 action,
@@ -412,7 +416,6 @@ private fun SectionTitle(text: String, action: String? = null, onAction: () -> U
         }
     }
 }
-
 @Composable
 private fun CategoryTile(category: Category, stat: MediaQueries.Stat?, modifier: Modifier, onClick: () -> Unit) {
     val style = category.style()
@@ -420,17 +423,17 @@ private fun CategoryTile(category: Category, stat: MediaQueries.Stat?, modifier:
         modifier
             .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
             Modifier
-                .size(50.dp)
-                .clip(RoundedCornerShape(17.dp))
-                .background(style.color.copy(alpha = 0.14f)),
+                .size(46.dp)
+                .clip(RoundedCornerShape(13.dp))
+                .background(style.color.copy(alpha = 0.10f)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(style.icon, contentDescription = null, tint = style.color, modifier = Modifier.size(24.dp))
+            Icon(style.icon, contentDescription = null, tint = style.color, modifier = Modifier.size(22.dp))
         }
         Text(
             category.label,
@@ -438,7 +441,7 @@ private fun CategoryTile(category: Category, stat: MediaQueries.Stat?, modifier:
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 5.dp),
+            modifier = Modifier.padding(top = 6.dp),
         )
         Text(
             stat?.let { if (category == Category.LARGE) formatSize(it.bytes) else String.format(Locale.FRANCE, "%,d", it.count) } ?: " ",
@@ -447,7 +450,6 @@ private fun CategoryTile(category: Category, stat: MediaQueries.Stat?, modifier:
         )
     }
 }
-
 @Composable
 private fun ShortcutTile(
     shortcut: Shortcut,
@@ -456,29 +458,26 @@ private fun ShortcutTile(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
 ) {
+    val scheme = MaterialTheme.colorScheme
     Row(
         modifier
             .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(scheme.surfaceContainerLowest)
+            .border(1.dp, scheme.outlineVariant, MaterialTheme.shapes.medium)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 10.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
-                .size(36.dp)
-                .background(shortcut.color.copy(alpha = 0.16f), RoundedCornerShape(11.dp)),
+                .size(34.dp)
+                .background(shortcut.color.copy(alpha = 0.10f), RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(shortcut.icon, null, tint = shortcut.color, modifier = Modifier.size(20.dp))
+            Icon(shortcut.icon, null, tint = shortcut.color, modifier = Modifier.size(19.dp))
         }
-        Column(Modifier.padding(start = 10.dp)) {
-            Text(
-                shortcut.label,
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Column(Modifier.padding(start = 12.dp)) {
+            Text(shortcut.label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
                 when (count) {
                     null -> " "
@@ -487,13 +486,12 @@ private fun ShortcutTile(
                     else -> "$count éléments"
                 },
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = scheme.onSurfaceVariant,
                 maxLines = 1,
             )
         }
     }
 }
-
 @Composable
 private fun UpdateBanner(state: com.scalari.fichiers.update.UpdateState, actions: HomeActions) {
     val (release, progress, error) = when (state) {

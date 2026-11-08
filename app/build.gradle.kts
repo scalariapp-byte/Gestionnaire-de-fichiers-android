@@ -112,6 +112,8 @@ dependencies {
     implementation("org.videolan.android:libvlc-all:3.7.2")
     // Vérification quotidienne des mises à jour.
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+    // QR code du lien de téléchargement (Paramètres → Partager).
+    implementation("com.google.zxing:core:3.5.3")
     implementation("com.google.guava:guava:33.3.1-android")
 
     // Archives : 7z, TAR (gz/bz2/xz) et RAR4.
