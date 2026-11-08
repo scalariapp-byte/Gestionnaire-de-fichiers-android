@@ -17,6 +17,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+val HOME_CATEGORIES = listOf(
+    Category.IMAGES, Category.VIDEOS, Category.AUDIO, Category.DOCUMENTS,
+    Category.ARCHIVES, Category.APKS, Category.LARGE,
+)
+
 class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _roots = MutableStateFlow<List<StorageRoot>>(emptyList())
@@ -24,6 +29,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _recent = MutableStateFlow<List<FileItem>>(emptyList())
     val recent: StateFlow<List<FileItem>> = _recent.asStateFlow()
+
+    private val _stats = MutableStateFlow<Map<Category, MediaQueries.Stat>>(emptyMap())
+    val stats: StateFlow<Map<Category, MediaQueries.Stat>> = _stats.asStateFlow()
 
     init {
         refresh()
@@ -36,6 +44,9 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
             _roots.value = withContext(Dispatchers.IO) { StorageRoots.list(ctx) }
             val showHidden = FileManagerApp.instance.settingsState.value.showHidden
             _recent.value = MediaQueries.query(ctx, Category.RECENT, showHidden, limit = 30)
+            val stats = HashMap<Category, MediaQueries.Stat>()
+            for (c in HOME_CATEGORIES) stats[c] = MediaQueries.stat(ctx, c, showHidden)
+            _stats.value = stats
         }
     }
 }

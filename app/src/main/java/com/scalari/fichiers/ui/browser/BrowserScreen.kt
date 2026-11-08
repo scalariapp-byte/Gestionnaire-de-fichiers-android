@@ -3,6 +3,22 @@
 package com.scalari.fichiers.ui.browser
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.scalari.fichiers.ui.components.subtitle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,13 +73,11 @@ import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -203,22 +217,8 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
             when {
                 state.selectionMode -> SelectionTopBar(
                     count = state.selected.size,
-                    single = vm.selectedItems().singleOrNull(),
-                    isFavorite = { it in settings.favorites },
                     onClose = vm::clearSelection,
-                    onCopy = { vm.copySelection(cut = false) },
-                    onCut = { vm.copySelection(cut = true) },
-                    onDelete = { requestDelete(vm.selectedFiles()) },
-                    onShare = { FileOpener.share(context, vm.selectedFiles()) },
-                    onRename = { item -> dialog = BrowserDialog.Rename(item) },
-                    onCompress = { dialog = BrowserDialog.Compress(vm.selectedFiles()) },
-                    onProperties = { dialog = BrowserDialog.Properties(vm.selectedFiles()) },
                     onSelectAll = vm::selectAll,
-                    onOpenWith = { item ->
-                        if (!FileOpener.openExternal(context, item.file, forceChooser = true, mime = "*/*")) message("Aucune application disponible")
-                    },
-                    onToggleFavorite = { item -> vm.toggleFavorite(item.path); vm.clearSelection() },
-                    onVault = { dialog = BrowserDialog.Vault(vm.selectedFiles()) },
                 )
 
                 state.searchActive -> SearchTopBar(
@@ -278,15 +278,44 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
         },
         bottomBar = {
             val c = clip
+            AnimatedVisibility(
+                visible = state.selectionMode,
+                enter = slideInVertically { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut(),
+            ) {
+                val single = vm.selectedItems().singleOrNull()
+                SelectionToolbar(
+                    single = single,
+                    isFavorite = { it in settings.favorites },
+                    onCopy = { vm.copySelection(cut = false) },
+                    onCut = { vm.copySelection(cut = true) },
+                    onDelete = { requestDelete(vm.selectedFiles()) },
+                    onShare = { FileOpener.share(context, vm.selectedFiles()) },
+                    onRename = { item -> dialog = BrowserDialog.Rename(item) },
+                    onCompress = { dialog = BrowserDialog.Compress(vm.selectedFiles()) },
+                    onProperties = { dialog = BrowserDialog.Properties(vm.selectedFiles()) },
+                    onOpenWith = { item ->
+                        if (!FileOpener.openExternal(context, item.file, forceChooser = true, mime = "*/*")) message("Aucune application disponible")
+                    },
+                    onToggleFavorite = { item -> vm.toggleFavorite(item.path); vm.clearSelection() },
+                    onVault = { dialog = BrowserDialog.Vault(vm.selectedFiles()) },
+                )
+            }
             if (c != null && !state.selectionMode) {
                 PasteBar(c, onPaste = vm::paste, onCancel = FileClipboard::clear)
             }
         },
         floatingActionButton = {
             if (!state.selectionMode && !state.searchActive && clip == null) {
-                FloatingActionButton(onClick = { dialog = BrowserDialog.NewFolder }) {
-                    Icon(Icons.Filled.CreateNewFolder, "Nouveau dossier")
+                val scrolled by remember(listState, gridState) {
+                    derivedStateOf { listState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemIndex > 0 }
                 }
+                ExtendedFloatingActionButton(
+                    onClick = { dialog = BrowserDialog.NewFolder },
+                    expanded = !scrolled,
+                    icon = { Icon(Icons.Filled.CreateNewFolder, null) },
+                    text = { Text("Nouveau dossier") },
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbar) },
@@ -348,25 +377,31 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                         contentPadding = PaddingValues(bottom = 88.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        items(visible, key = { it.path }, contentType = { if (it.isDirectory) 0 else 1 }) { item ->
-                            if (showParentInSubtitle) {
-                                FileRow(
-                                    modifier = Modifier.animateItem(),
-                                    item = item,
-                                    selected = item.path in state.selected,
-                                    onClick = { onItemClick(item) },
-                                    onLongClick = { onItemLongClick(item) },
-                                    supporting = item.file.parentFile?.toRelativeString(state.currentDir)?.ifEmpty { "." } ?: "",
-                                )
+                        @Composable
+                        fun FileEntry(item: FileItem) = FileRow(
+                            modifier = Modifier.animateItem(),
+                            item = item,
+                            selected = item.path in state.selected,
+                            onClick = { onItemClick(item) },
+                            onLongClick = { onItemLongClick(item) },
+                            supporting = if (showParentInSubtitle) {
+                                item.file.parentFile?.toRelativeString(state.currentDir)?.ifEmpty { "." } ?: ""
                             } else {
-                                FileRow(
-                                    modifier = Modifier.animateItem(),
-                                    item = item,
-                                    selected = item.path in state.selected,
-                                    onClick = { onItemClick(item) },
-                                    onLongClick = { onItemLongClick(item) },
-                                )
+                                item.subtitle()
+                            },
+                        )
+                        if (settings.foldersFirst && !showParentInSubtitle) {
+                            val (dirs, files) = visible.partition { it.isDirectory }
+                            if (dirs.isNotEmpty()) {
+                                item(key = "h:dirs", contentType = "header") { SectionHeader("Dossiers", dirs.size) }
+                                items(dirs, key = { it.path }, contentType = { 0 }) { FileEntry(it) }
                             }
+                            if (files.isNotEmpty()) {
+                                item(key = "h:files", contentType = "header") { SectionHeader("Fichiers", files.size) }
+                                items(files, key = { it.path }, contentType = { 1 }) { FileEntry(it) }
+                            }
+                        } else {
+                            items(visible, key = { it.path }, contentType = { if (it.isDirectory) 0 else 1 }) { FileEntry(it) }
                         }
                     }
                 }
@@ -467,17 +502,43 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
 }
 
 @Composable
-private fun MenuItem(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun MenuItem(text: String, icon: ImageVector, onClick: () -> Unit) {
     DropdownMenuItem(text = { Text(text) }, leadingIcon = { Icon(icon, null) }, onClick = onClick)
 }
 
+@Composable
+fun SelectionTopBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Unit) {
+    TopAppBar(
+        navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "Annuler la sélection") } },
+        title = {
+            AnimatedContent(targetState = count, label = "count") { n ->
+                Text("$n sélectionné${if (n > 1) "s" else ""}")
+            }
+        },
+        actions = { IconButton(onClick = onSelectAll) { Icon(Icons.Filled.SelectAll, "Tout sélectionner") } },
+    )
+}
+
+@Composable
+private fun ToolbarAction(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, contentDescription = null)
+        Text(label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
+    }
+}
+
+/** Barre d'actions de sélection, en bas de l'écran (accessible au pouce). */
 @Suppress("DEPRECATION")
 @Composable
-private fun SelectionTopBar(
-    count: Int,
+fun SelectionToolbar(
     single: FileItem?,
     isFavorite: (String) -> Boolean,
-    onClose: () -> Unit,
     onCopy: () -> Unit,
     onCut: () -> Unit,
     onDelete: () -> Unit,
@@ -485,45 +546,67 @@ private fun SelectionTopBar(
     onRename: (FileItem) -> Unit,
     onCompress: () -> Unit,
     onProperties: () -> Unit,
-    onSelectAll: () -> Unit,
     onOpenWith: (FileItem) -> Unit,
     onToggleFavorite: (FileItem) -> Unit,
     onVault: () -> Unit,
 ) {
-    TopAppBar(
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-        navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "Annuler la sélection") } },
-        title = { Text("$count sélectionné${if (count > 1) "s" else ""}") },
-        actions = {
-            IconButton(onClick = onCopy) { Icon(Icons.Filled.ContentCopy, "Copier") }
-            IconButton(onClick = onCut) { Icon(Icons.Filled.ContentCut, "Couper") }
-            IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, "Supprimer") }
-            var menu by remember { mutableStateOf(false) }
-            IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "Plus") }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                MenuItem("Partager", Icons.Filled.Share) { menu = false; onShare() }
-                if (single != null) {
-                    MenuItem("Renommer", Icons.Filled.Edit) { menu = false; onRename(single) }
-                    if (!single.isDirectory) {
-                        MenuItem("Ouvrir avec…", Icons.Filled.OpenInNew) { menu = false; onOpenWith(single) }
-                    } else {
-                        val fav = isFavorite(single.path)
-                        MenuItem(
-                            if (fav) "Retirer des favoris" else "Ajouter aux favoris",
-                            if (fav) Icons.Filled.Star else Icons.Filled.StarBorder,
-                        ) { menu = false; onToggleFavorite(single) }
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 6.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            ToolbarAction(Icons.Filled.ContentCopy, "Copier", onCopy)
+            ToolbarAction(Icons.Filled.ContentCut, "Couper", onCut)
+            ToolbarAction(Icons.Filled.Share, "Partager", onShare)
+            ToolbarAction(Icons.Filled.Delete, "Supprimer", onDelete)
+            Box {
+                var menu by remember { mutableStateOf(false) }
+                ToolbarAction(Icons.Filled.MoreVert, "Plus") { menu = true }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    if (single != null) {
+                        MenuItem("Renommer", Icons.Filled.Edit) { menu = false; onRename(single) }
+                        if (!single.isDirectory) {
+                            MenuItem("Ouvrir avec…", Icons.Filled.OpenInNew) { menu = false; onOpenWith(single) }
+                        } else {
+                            val fav = isFavorite(single.path)
+                            MenuItem(
+                                if (fav) "Retirer des favoris" else "Ajouter aux favoris",
+                                if (fav) Icons.Filled.Star else Icons.Filled.StarBorder,
+                            ) { menu = false; onToggleFavorite(single) }
+                        }
                     }
+                    MenuItem("Mettre au coffre-fort", Icons.Filled.Lock) { menu = false; onVault() }
+                    MenuItem("Compresser (ZIP)", Icons.Filled.Archive) { menu = false; onCompress() }
+                    MenuItem("Propriétés", Icons.Filled.Info) { menu = false; onProperties() }
                 }
-                MenuItem("Mettre au coffre-fort", Icons.Filled.Lock) { menu = false; onVault() }
-                MenuItem("Compresser (ZIP)", Icons.Filled.Archive) { menu = false; onCompress() }
-                if (single?.extension == "zip") {
-                    MenuItem("Ouvrir l'archive", Icons.Filled.Unarchive) { menu = false; onOpenWith(single) }
-                }
-                MenuItem("Tout sélectionner", Icons.Filled.SelectAll) { menu = false; onSelectAll() }
-                MenuItem("Propriétés", Icons.Filled.Info) { menu = false; onProperties() }
             }
-        },
-    )
+        }
+    }
+}
+
+@Composable
+fun SectionHeader(title: String, count: Int) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+        Text(
+            "  $count",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
 }
 
 @Composable
@@ -556,9 +639,8 @@ private fun SearchTopBar(query: String, folderName: String, onQuery: (String) ->
     )
 }
 
-@Suppress("DEPRECATION")
 @Composable
-private fun Breadcrumbs(root: File, rootName: String, current: File, onClick: (File) -> Unit) {
+fun Breadcrumbs(root: File, rootName: String, current: File, onClick: (File) -> Unit) {
     val segments = remember(root, current) {
         val list = ArrayList<File>()
         var f: File? = current
@@ -570,60 +652,72 @@ private fun Breadcrumbs(root: File, rootName: String, current: File, onClick: (F
         list.reversed()
     }
     val rowState = rememberLazyListState()
-    LaunchedEffect(segments.size) { if (segments.isNotEmpty()) rowState.scrollToItem(segments.lastIndex) }
+    LaunchedEffect(segments.size) { if (segments.isNotEmpty()) rowState.animateScrollToItem(segments.lastIndex) }
     LazyRow(
         state = rowState,
-        contentPadding = PaddingValues(horizontal = 8.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
         itemsIndexed(segments, key = { _, f -> f.absolutePath }) { index, f ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (index > 0) {
-                    Icon(
-                        Icons.Filled.ChevronRight, null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            val last = index == segments.lastIndex
+            Surface(
+                shape = CircleShape,
+                color = if (last) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                contentColor = if (last) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(enabled = !last) { onClick(f) },
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (index == 0) {
+                        Icon(Icons.Filled.Home, null, Modifier.size(16.dp).padding(end = 2.dp))
+                    }
+                    Text(
+                        if (index == 0) rootName else f.name,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
                     )
                 }
-                val last = index == segments.lastIndex
-                Text(
-                    if (index == 0) rootName else f.name,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (last) FontWeight.Bold else FontWeight.Normal,
-                    color = if (last) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .clickable(enabled = !last) { onClick(f) }
-                        .padding(horizontal = 6.dp, vertical = 10.dp),
-                )
             }
         }
     }
 }
 
 @Composable
-private fun PasteBar(clip: Clip, onPaste: () -> Unit, onCancel: () -> Unit) {
-    BottomAppBar {
-        Column(
-            Modifier
-                .weight(1f)
-                .padding(start = 8.dp)
-        ) {
-            Text(
-                "${clip.files.size} élément${if (clip.files.size > 1) "s" else ""} ${if (clip.cut) "à déplacer" else "à copier"}",
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                clip.files.first().name + if (clip.files.size > 1) "…" else "",
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        OutlinedButton(onClick = onCancel, modifier = Modifier.padding(end = 8.dp)) { Text("Annuler") }
-        Button(onClick = onPaste, modifier = Modifier.padding(end = 8.dp)) {
-            Icon(Icons.Filled.ContentPaste, null, Modifier.size(18.dp))
-            Text(if (clip.cut) " Déplacer ici" else " Coller ici")
+fun PasteBar(clip: Clip, onPaste: () -> Unit, onCancel: () -> Unit) {
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        shadowElevation = 6.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        Row(Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "${clip.files.size} élément${if (clip.files.size > 1) "s" else ""} ${if (clip.cut) "à déplacer" else "à copier"}",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    clip.files.first().name + if (clip.files.size > 1) "…" else "",
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            TextButton(onClick = onCancel) { Text("Annuler", color = MaterialTheme.colorScheme.inversePrimary) }
+            Button(onClick = onPaste) {
+                Icon(Icons.Filled.ContentPaste, null, Modifier.size(18.dp))
+                Text(if (clip.cut) "  Déplacer ici" else "  Coller ici")
+            }
         }
     }
 }
@@ -638,12 +732,19 @@ private fun EmptyState(text: String, searching: Boolean) {
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(
-            if (searching) Icons.Filled.SearchOff else Icons.Filled.FolderOff,
-            null,
-            modifier = Modifier.size(72.dp),
-            tint = MaterialTheme.colorScheme.outline,
-        )
+        Box(
+            Modifier
+                .size(120.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                if (searching) Icons.Filled.SearchOff else Icons.Filled.FolderOff,
+                null,
+                modifier = Modifier.size(56.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
     }
 }

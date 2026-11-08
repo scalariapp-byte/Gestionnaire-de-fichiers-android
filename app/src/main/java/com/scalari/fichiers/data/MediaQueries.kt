@@ -30,28 +30,10 @@ object MediaQueries {
         limit: Int = 5000,
     ): List<FileItem> = withContext(Dispatchers.IO) {
         val uri = MediaStore.Files.getContentUri("external")
-        val col = MediaStore.Files.FileColumns.MEDIA_TYPE
         val data = MediaStore.MediaColumns.DATA
         val size = MediaStore.MediaColumns.SIZE
         val date = MediaStore.MediaColumns.DATE_MODIFIED
-        val mime = MediaStore.MediaColumns.MIME_TYPE
-
-        fun byExt(exts: Collection<String>): Pair<String, Array<String>> =
-            exts.joinToString(" OR ", "(", ")") { "$data LIKE ?" } to exts.map { "%.$it" }.toTypedArray()
-
-        val (selection, args) = when (category) {
-            Category.IMAGES -> "$col=?" to arrayOf(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString())
-            Category.VIDEOS -> "$col=?" to arrayOf(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString())
-            Category.AUDIO -> "$col=?" to arrayOf(MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO.toString())
-            Category.DOCUMENTS -> byExt(FileTypes.documentExtensions)
-            Category.ARCHIVES -> byExt(FileTypes.archiveExtensions)
-            Category.APKS -> byExt(listOf("apk", "apks", "xapk"))
-            Category.LARGE -> "$size>?" to arrayOf(LARGE_THRESHOLD.toString())
-            Category.RECENT -> {
-                val since = (System.currentTimeMillis() - 30L * 24 * 3600 * 1000) / 1000
-                "$mime IS NOT NULL AND $date>?" to arrayOf(since.toString())
-            }
-        }
+        val (selection, args) = selectionFor(category)
         val sort = if (category == Category.LARGE) "$size DESC" else "$date DESC"
         val max = if (category == Category.RECENT) minOf(limit, 200) else limit
 
@@ -82,5 +64,59 @@ object MediaQueries {
             }
         }
         out
+    }
+
+    @Suppress("DEPRECATION")
+    private fun selectionFor(category: Category): Pair<String, Array<String>> {
+        val col = MediaStore.Files.FileColumns.MEDIA_TYPE
+        val data = MediaStore.MediaColumns.DATA
+        val size = MediaStore.MediaColumns.SIZE
+        val date = MediaStore.MediaColumns.DATE_MODIFIED
+        val mime = MediaStore.MediaColumns.MIME_TYPE
+
+        fun byExt(exts: Collection<String>): Pair<String, Array<String>> =
+            exts.joinToString(" OR ", "(", ")") { "$data LIKE ?" } to exts.map { "%.$it" }.toTypedArray()
+
+        return when (category) {
+            Category.IMAGES -> "$col=?" to arrayOf(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString())
+            Category.VIDEOS -> "$col=?" to arrayOf(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString())
+            Category.AUDIO -> "$col=?" to arrayOf(MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO.toString())
+            Category.DOCUMENTS -> byExt(FileTypes.documentExtensions)
+            Category.ARCHIVES -> byExt(FileTypes.archiveExtensions)
+            Category.APKS -> byExt(listOf("apk", "apks", "xapk"))
+            Category.LARGE -> "$size>?" to arrayOf(LARGE_THRESHOLD.toString())
+            Category.RECENT -> {
+                val since = (System.currentTimeMillis() - 30L * 24 * 3600 * 1000) / 1000
+                "$mime IS NOT NULL AND $date>?" to arrayOf(since.toString())
+            }
+        }
+    }
+
+    data class Stat(val count: Int, val bytes: Long)
+
+    /** Nombre de fichiers et taille totale d'une catégorie (sans vérifier l'existence : rapide). */
+    @Suppress("DEPRECATION")
+    suspend fun stat(context: Context, category: Category, showHidden: Boolean): Stat = withContext(Dispatchers.IO) {
+        val data = MediaStore.MediaColumns.DATA
+        val size = MediaStore.MediaColumns.SIZE
+        val (selection, args) = selectionFor(category)
+        var count = 0
+        var bytes = 0L
+        runCatching {
+            context.contentResolver.query(
+                MediaStore.Files.getContentUri("external"), arrayOf(data, size), selection, args, null
+            )?.use { c ->
+                val iData = c.getColumnIndexOrThrow(data)
+                val iSize = c.getColumnIndexOrThrow(size)
+                while (c.moveToNext()) {
+                    val path = c.getString(iData) ?: continue
+                    if (path.contains("/${TrashManager.TRASH_DIR}/") || path.contains("/${VaultManager.DIR_NAME}/")) continue
+                    if (!showHidden && path.contains("/.")) continue
+                    count++
+                    bytes += c.getLong(iSize)
+                }
+            }
+        }
+        Stat(count, bytes)
     }
 }

@@ -3,6 +3,11 @@
 package com.scalari.fichiers.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
@@ -30,11 +35,7 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Slideshow
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -94,7 +95,7 @@ fun FileThumbnail(item: FileItem, modifier: Modifier = Modifier, iconSize: Int =
     val color = item.type.tint()
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(color.copy(alpha = 0.14f)),
         contentAlignment = Alignment.Center,
     ) {
@@ -136,26 +137,55 @@ fun FileRow(
     modifier: Modifier = Modifier,
     supporting: String = item.subtitle(),
 ) {
-    val bg = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
-    ListItem(
-        modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        colors = ListItemDefaults.colors(containerColor = bg),
-        leadingContent = {
-            Box(contentAlignment = Alignment.Center) {
-                FileThumbnail(item, Modifier.size(46.dp))
-                if (selected) SelectedBadge(Modifier.align(Alignment.BottomEnd))
-            }
-        },
-        headlineContent = {
+    val bg by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+        label = "rowBg",
+    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .background(bg)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            FileThumbnail(item, Modifier.size(48.dp))
+            if (selected) SelectedBadge(Modifier.align(Alignment.BottomEnd))
+        }
+        Column(
+            Modifier
+                .weight(1f)
+                .padding(start = 16.dp)
+        ) {
             Text(
                 item.name,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = if (item.isHidden) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
+                color = if (item.isHidden) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )
-        },
-        supportingContent = { Text(supporting, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-    )
+            Text(
+                supporting,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        if (item.isDirectory && !selected) {
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
 }
 
 @Composable
@@ -178,35 +208,46 @@ fun FileGridItem(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
+    val bg by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+        label = "gridBg",
+    )
+    Column(
         modifier = modifier
             .padding(4.dp)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerLow
-        ),
+            .clip(MaterialTheme.shapes.medium)
+            .background(bg)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(6.dp),
     ) {
-        Column(Modifier.padding(6.dp)) {
-            Box {
-                FileThumbnail(
-                    item,
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f),
-                    iconSize = 44,
-                )
-                if (selected) SelectedBadge(Modifier.align(Alignment.TopEnd).padding(4.dp))
-            }
-            Text(
-                item.name,
-                style = MaterialTheme.typography.bodySmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
+        Box {
+            FileThumbnail(
+                item,
+                Modifier
                     .fillMaxWidth()
-                    .padding(top = 6.dp),
+                    .aspectRatio(1f),
+                iconSize = 44,
+            )
+            if (selected) SelectedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
+        }
+        Text(
+            item.name,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+        )
+        if (item.isDirectory && item.childCount >= 0) {
+            Text(
+                "${item.childCount} élément${if (item.childCount > 1) "s" else ""}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

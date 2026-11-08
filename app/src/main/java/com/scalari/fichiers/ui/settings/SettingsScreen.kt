@@ -17,6 +17,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -62,8 +68,9 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            Header("Apparence")
+            Group("Apparence") {
             ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 modifier = Modifier.clickable { themeDialog = true },
                 headlineContent = { Text("Thème") },
                 supportingContent = { Text(settings.themeMode.label) },
@@ -77,8 +84,8 @@ fun SettingsScreen(onBack: () -> Unit) {
                 scope.launch { repo.setGridView(it) }
             }
 
-            HorizontalDivider()
-            Header("Fichiers")
+            }
+            Group("Fichiers") {
             SwitchItem("Afficher les fichiers cachés", "Fichiers et dossiers commençant par « . »", settings.showHidden) {
                 scope.launch { repo.setShowHidden(it) }
             }
@@ -92,19 +99,23 @@ fun SettingsScreen(onBack: () -> Unit) {
                 scope.launch { repo.setConfirmDelete(it) }
             }
 
-            HorizontalDivider()
-            Header("Système")
+            }
+            Group("Système") {
             if (StoragePermission.needsAllFilesAccess()) {
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                     modifier = Modifier.clickable { StoragePermission.openAllFilesSettings(context) },
                     headlineContent = { Text("Autorisation d'accès aux fichiers") },
                     supportingContent = { Text("Ouvrir les réglages Android") },
                 )
             }
             ListItem(
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 headlineContent = { Text("Version") },
                 supportingContent = { Text(BuildConfig.VERSION_NAME) },
             )
+            }
+            Spacer(Modifier.height(24.dp))
         }
     }
 
@@ -128,18 +139,28 @@ fun SettingsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun Header(text: String) {
+private fun Group(title: String, content: @Composable () -> Unit) {
     Text(
-        text,
+        title,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = 32.dp, top = 20.dp, bottom = 8.dp),
     )
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+    ) {
+        Column { content() }
+    }
 }
 
 @Composable
 private fun SwitchItem(title: String, subtitle: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier.clickable { onChange(!checked) },
         headlineContent = { Text(title) },
         supportingContent = if (subtitle != null) { { Text(subtitle) } } else null,

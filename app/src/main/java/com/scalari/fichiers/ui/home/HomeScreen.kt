@@ -1,25 +1,34 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 
 package com.scalari.fichiers.ui.home
 
 import android.os.Environment
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Delete
@@ -27,37 +36,41 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SdCard
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -66,10 +79,12 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scalari.fichiers.FileManagerApp
+import com.scalari.fichiers.R
 import com.scalari.fichiers.data.Category
 import com.scalari.fichiers.data.FileItem
 import com.scalari.fichiers.data.FileType
 import com.scalari.fichiers.data.FileTypes
+import com.scalari.fichiers.data.MediaQueries
 import com.scalari.fichiers.data.StorageRoot
 import com.scalari.fichiers.data.formatSize
 import com.scalari.fichiers.ui.AppNavigator
@@ -78,17 +93,44 @@ import com.scalari.fichiers.ui.LocalSnackbarHostState
 import com.scalari.fichiers.ui.components.FileThumbnail
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.Locale
 
-private data class CategoryEntry(val category: Category, val icon: ImageVector, val color: Color)
+private data class CategoryStyle(val icon: ImageVector, val color: Color)
 
-private val categories = listOf(
-    CategoryEntry(Category.IMAGES, Icons.Filled.PhotoLibrary, Color(0xFF43A047)),
-    CategoryEntry(Category.VIDEOS, Icons.Filled.VideoLibrary, Color(0xFFE53935)),
-    CategoryEntry(Category.AUDIO, Icons.Filled.LibraryMusic, Color(0xFF8E24AA)),
-    CategoryEntry(Category.DOCUMENTS, Icons.Filled.Description, Color(0xFF1E88E5)),
-    CategoryEntry(Category.ARCHIVES, Icons.Filled.FolderZip, Color(0xFF8D6E63)),
-    CategoryEntry(Category.APKS, Icons.Filled.Apps, Color(0xFF7CB342)),
-    CategoryEntry(Category.LARGE, Icons.Filled.Storage, Color(0xFFEF6C00)),
+private fun Category.style(): CategoryStyle = when (this) {
+    Category.IMAGES -> CategoryStyle(Icons.Filled.PhotoLibrary, Color(0xFF2E9E5B))
+    Category.VIDEOS -> CategoryStyle(Icons.Filled.VideoLibrary, Color(0xFFE5484D))
+    Category.AUDIO -> CategoryStyle(Icons.Filled.LibraryMusic, Color(0xFF8E4EC6))
+    Category.DOCUMENTS -> CategoryStyle(Icons.Filled.Description, Color(0xFF3E7BFA))
+    Category.ARCHIVES -> CategoryStyle(Icons.Filled.FolderZip, Color(0xFFB0793F))
+    Category.APKS -> CategoryStyle(Icons.Filled.Apps, Color(0xFF5BA33B))
+    Category.LARGE -> CategoryStyle(Icons.Filled.Storage, Color(0xFFF07A1A))
+    Category.RECENT -> CategoryStyle(Icons.Filled.Storage, Color(0xFF607D8B))
+}
+
+data class Shortcut(val label: String, val icon: ImageVector, val path: String)
+
+fun defaultShortcuts(): List<Shortcut> {
+    val base = Environment.getExternalStorageDirectory()
+    return listOf(
+        Shortcut("Téléchargements", Icons.Filled.Download, File(base, Environment.DIRECTORY_DOWNLOADS).absolutePath),
+        Shortcut("Appareil photo", Icons.Filled.PhotoCamera, File(base, Environment.DIRECTORY_DCIM).absolutePath),
+        Shortcut("Documents", Icons.Filled.Description, File(base, Environment.DIRECTORY_DOCUMENTS).absolutePath),
+        Shortcut("Images", Icons.Filled.PhotoLibrary, File(base, Environment.DIRECTORY_PICTURES).absolutePath),
+        Shortcut("Musique", Icons.Filled.LibraryMusic, File(base, Environment.DIRECTORY_MUSIC).absolutePath),
+        Shortcut("Films", Icons.Filled.VideoLibrary, File(base, Environment.DIRECTORY_MOVIES).absolutePath),
+    )
+}
+
+class HomeActions(
+    val onSearch: () -> Unit = {},
+    val onSettings: () -> Unit = {},
+    val onOpenPath: (String) -> Unit = {},
+    val onCategory: (Category) -> Unit = {},
+    val onRemoveFavorite: (String) -> Unit = {},
+    val onRecent: (FileItem) -> Unit = {},
+    val onVault: () -> Unit = {},
+    val onTrash: () -> Unit = {},
 )
 
 @Composable
@@ -96,151 +138,258 @@ fun HomeScreen(navigator: AppNavigator) {
     val vm: HomeViewModel = viewModel()
     val roots by vm.roots.collectAsStateWithLifecycle()
     val recent by vm.recent.collectAsStateWithLifecycle()
+    val stats by vm.stats.collectAsStateWithLifecycle()
     val settings by FileManagerApp.instance.settingsState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val snackbar = LocalSnackbarHostState.current
     val scope = rememberCoroutineScope()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.refresh() }
 
-    fun openRecent(item: FileItem) {
-        when {
-            item.type == FileType.IMAGE -> navigator.image(item.path)
-            FileTypes.isTextEditable(item) -> navigator.text(item.path)
-            !FileOpener.openExternal(context, item.file) ->
-                scope.launch { snackbar.showSnackbar("Aucune application pour ouvrir ce fichier") }
+    val actions = HomeActions(
+        onSearch = { navigator.browser(null, search = true) },
+        onSettings = navigator::settings,
+        onOpenPath = { navigator.browser(it) },
+        onCategory = navigator::category,
+        onRemoveFavorite = { path ->
+            scope.launch {
+                FileManagerApp.instance.settings.removeFavorite(path)
+                snackbar.showSnackbar("Retiré des favoris")
+            }
+        },
+        onRecent = { item ->
+            when {
+                item.type == FileType.IMAGE -> navigator.image(item.path)
+                FileTypes.isTextEditable(item) -> navigator.text(item.path)
+                !FileOpener.openExternal(context, item.file) ->
+                    scope.launch { snackbar.showSnackbar("Aucune application pour ouvrir ce fichier") }
+            }
+        },
+        onVault = navigator::vault,
+        onTrash = navigator::trash,
+    )
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+        HomeContent(
+            roots = roots,
+            stats = stats,
+            shortcuts = remember { defaultShortcuts() },
+            favorites = settings.favorites,
+            recent = recent,
+            actions = actions,
+            contentPadding = padding,
+        )
+    }
+}
+
+@Composable
+fun HomeContent(
+    roots: List<StorageRoot>,
+    stats: Map<Category, MediaQueries.Stat>,
+    shortcuts: List<Shortcut>,
+    favorites: List<String>,
+    recent: List<FileItem>,
+    actions: HomeActions,
+    contentPadding: PaddingValues = PaddingValues(),
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface),
+        contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 32.dp),
+    ) {
+        item(key = "header") { Header(actions) }
+        item(key = "search") { SearchPill(actions.onSearch) }
+
+        items(roots, key = { "root:" + it.path.absolutePath }) { root ->
+            if (root.isPrimary) StorageHero(root) { actions.onOpenPath(root.path.absolutePath) }
+            else StorageSmall(root) { actions.onOpenPath(root.path.absolutePath) }
+        }
+
+        item(key = "catTitle") { SectionTitle("Catégories") }
+        item(key = "cats") {
+            Column(Modifier.padding(horizontal = 12.dp)) {
+                HOME_CATEGORIES.chunked(4).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { c ->
+                            CategoryTile(c, stats[c], Modifier.weight(1f)) { actions.onCategory(c) }
+                        }
+                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+
+        item(key = "shortTitle") { SectionTitle("Accès rapide") }
+        item(key = "shorts") {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(shortcuts, key = { it.path }) { s -> ShortcutChip(s) { actions.onOpenPath(s.path) } }
+            }
+        }
+
+        if (recent.isNotEmpty()) {
+            item(key = "recentTitle") {
+                SectionTitle("Récents", action = "Tout voir") { actions.onCategory(Category.RECENT) }
+            }
+            item(key = "recent") {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(recent, key = { it.path }) { item -> RecentCard(item) { actions.onRecent(item) } }
+                }
+            }
+        }
+
+        if (favorites.isNotEmpty()) {
+            item(key = "favTitle") { SectionTitle("Favoris") }
+            items(favorites, key = { "fav:$it" }) { path ->
+                FavoriteRow(path, onClick = { actions.onOpenPath(path) }, onLongClick = { actions.onRemoveFavorite(path) })
+            }
+        }
+
+        item(key = "toolsTitle") { SectionTitle("Outils") }
+        item(key = "tools") {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ToolCard(
+                    title = "Coffre-fort",
+                    subtitle = "Fichiers chiffrés",
+                    icon = Icons.Filled.Shield,
+                    brush = Brush.linearGradient(listOf(Color(0xFF4F8BFF), Color(0xFF5B3DF5))),
+                    content = Color.White,
+                    modifier = Modifier.weight(1f),
+                    onClick = actions.onVault,
+                )
+                ToolCard(
+                    title = "Corbeille",
+                    subtitle = "Restaurer",
+                    icon = Icons.Filled.Delete,
+                    brush = Brush.linearGradient(
+                        listOf(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.surfaceContainerHigh)
+                    ),
+                    content = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                    onClick = actions.onTrash,
+                )
+            }
         }
     }
+}
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Fichiers") },
-                actions = {
-                    IconButton(onClick = { navigator.browser(null, search = true) }) {
-                        Icon(Icons.Filled.Search, "Rechercher")
-                    }
-                    IconButton(onClick = navigator::settings) { Icon(Icons.Filled.Settings, "Paramètres") }
-                },
+@Composable
+private fun Header(actions: HomeActions) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Image(painterResource(R.drawable.ic_logo), contentDescription = null, modifier = Modifier.size(36.dp))
+        Text(
+            "Fichiers",
+            style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .weight(1f),
+        )
+        IconButton(onClick = actions.onSettings) { Icon(Icons.Filled.Settings, "Paramètres") }
+    }
+}
+
+@Composable
+private fun SearchPill(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .height(56.dp),
+    ) {
+        Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Rechercher des fichiers",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(start = 14.dp),
             )
-        },
-        snackbarHost = { SnackbarHost(snackbar) },
-    ) { padding ->
-        LazyColumn(
-            contentPadding = PaddingValues(
-                top = padding.calculateTopPadding() + 4.dp,
-                bottom = padding.calculateBottomPadding() + 24.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item { SectionTitle("Stockage") }
-            items(roots, key = { it.path.absolutePath }) { root ->
-                StorageCard(root) { navigator.browser(root.path.absolutePath) }
-            }
+        }
+    }
+}
 
-            item { SectionTitle("Catégories") }
-            item {
-                Column(Modifier.padding(horizontal = 8.dp)) {
-                    categories.chunked(4).forEach { row ->
-                        Row(Modifier.fillMaxWidth()) {
-                            row.forEach { entry ->
-                                CategoryButton(entry, Modifier.weight(1f)) { navigator.category(entry.category) }
-                            }
-                            repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
-                        }
-                    }
-                }
-            }
+@Composable
+private fun UsageRing(fraction: Float, track: Color, progress: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val stroke = size.minDimension * 0.12f
+        val inset = stroke / 2
+        val arcSize = Size(size.width - stroke, size.height - stroke)
+        drawArc(track, -90f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(stroke))
+        drawArc(
+            progress, -90f, 360f * fraction.coerceIn(0f, 1f), false, Offset(inset, inset), arcSize,
+            style = Stroke(stroke, cap = StrokeCap.Round),
+        )
+    }
+}
 
-            item { SectionTitle("Raccourcis") }
-            item {
-                val base = Environment.getExternalStorageDirectory()
-                val shortcuts = listOf(
-                    Triple("Téléchargements", Icons.Filled.Download, Environment.DIRECTORY_DOWNLOADS),
-                    Triple("Appareil photo", Icons.Filled.PhotoCamera, Environment.DIRECTORY_DCIM),
-                    Triple("Documents", Icons.Filled.Description, Environment.DIRECTORY_DOCUMENTS),
-                    Triple("Images", Icons.Filled.PhotoLibrary, Environment.DIRECTORY_PICTURES),
-                    Triple("Musique", Icons.Filled.LibraryMusic, Environment.DIRECTORY_MUSIC),
-                    Triple("Films", Icons.Filled.VideoLibrary, Environment.DIRECTORY_MOVIES),
+private fun percent(root: StorageRoot): Float = if (root.total > 0) root.used.toFloat() / root.total else 0f
+
+@Composable
+private fun StorageHero(root: StorageRoot, onClick: () -> Unit) {
+    val fraction = percent(root)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp)
+            .clip(MaterialTheme.shapes.extraLarge)
+            .background(Brush.linearGradient(listOf(Color(0xFF3F7DFF), Color(0xFF6A4FD8))))
+            .clickable(onClick = onClick)
+            .padding(24.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(root.name, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.9f))
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    formatSize(root.used),
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = Color.White,
                 )
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(shortcuts) { (label, icon, dir) ->
-                        ShortcutChip(label, icon) { navigator.browser(File(base, dir).absolutePath) }
-                    }
-                }
-            }
-
-            if (settings.favorites.isNotEmpty()) {
-                item { SectionTitle("Favoris") }
-                items(settings.favorites, key = { "fav:$it" }) { path ->
-                    val f = File(path)
-                    ListItem(
-                        modifier = Modifier.combinedClickable(
-                            onClick = { navigator.browser(path) },
-                            onLongClick = {
-                                scope.launch {
-                                    FileManagerApp.instance.settings.removeFavorite(path)
-                                    snackbar.showSnackbar("Retiré des favoris")
-                                }
-                            },
-                        ),
-                        leadingContent = { Icon(Icons.Filled.Star, null, tint = Color(0xFFFFB300)) },
-                        headlineContent = { Text(f.name.ifEmpty { path }) },
-                        supportingContent = { Text(path, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                Text(
+                    "utilisés sur ${formatSize(root.total)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.8f),
+                )
+                Spacer(Modifier.height(14.dp))
+                Surface(shape = CircleShape, color = Color.White.copy(alpha = 0.18f)) {
+                    Text(
+                        "${formatSize(root.free)} libres",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     )
                 }
             }
-
-            if (recent.isNotEmpty()) {
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        SectionTitle("Fichiers récents", Modifier.weight(1f))
-                        Text(
-                            "Tout voir",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier
-                                .clickable { navigator.category(Category.RECENT) }
-                                .padding(16.dp),
-                        )
-                    }
-                }
-                item {
-                    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(recent, key = { it.path }) { item ->
-                            Column(
-                                Modifier
-                                    .width(96.dp)
-                                    .clickable { openRecent(item) },
-                            ) {
-                                FileThumbnail(item, Modifier.size(96.dp), iconSize = 36)
-                                Text(
-                                    item.name,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(top = 4.dp),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item { SectionTitle("Outils") }
-            item {
-                ListItem(
-                    modifier = Modifier.clickable(onClick = navigator::vault),
-                    leadingContent = { Icon(Icons.Filled.Lock, null, tint = MaterialTheme.colorScheme.primary) },
-                    headlineContent = { Text("Coffre-fort") },
-                    supportingContent = { Text("Fichiers chiffrés et cachés, protégés par code") },
+            Box(contentAlignment = Alignment.Center) {
+                UsageRing(
+                    fraction,
+                    track = Color.White.copy(alpha = 0.22f),
+                    progress = if (fraction > 0.9f) Color(0xFFFFB4AB) else Color.White,
+                    modifier = Modifier.size(104.dp),
                 )
-            }
-            item {
-                ListItem(
-                    modifier = Modifier.clickable(onClick = navigator::trash),
-                    leadingContent = { Icon(Icons.Filled.Delete, null) },
-                    headlineContent = { Text("Corbeille") },
-                    supportingContent = { Text("Restaurer ou supprimer définitivement") },
+                Text(
+                    String.format(Locale.FRANCE, "%d %%", (fraction * 100).toInt()),
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color.White,
                 )
             }
         }
@@ -248,46 +397,39 @@ fun HomeScreen(navigator: AppNavigator) {
 }
 
 @Composable
-private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
-    )
-}
-
-@Composable
-private fun StorageCard(root: StorageRoot, onClick: () -> Unit) {
-    Card(
+private fun StorageSmall(root: StorageRoot, onClick: () -> Unit) {
+    val fraction = percent(root)
+    Surface(
         onClick = onClick,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 20.dp, vertical = 6.dp),
     ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                if (root.isPrimary) Icons.Filled.Smartphone else Icons.Filled.SdCard,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(36.dp),
-            )
+        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(contentAlignment = Alignment.Center) {
+                UsageRing(
+                    fraction,
+                    track = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    progress = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
+                )
+                Icon(
+                    if (root.isRemovable) Icons.Filled.SdCard else Icons.Filled.Usb,
+                    null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             Column(
                 Modifier
                     .padding(start = 16.dp)
                     .weight(1f)
             ) {
                 Text(root.name, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(6.dp))
-                val fraction = if (root.total > 0) root.used.toFloat() / root.total else 0f
-                LinearProgressIndicator(
-                    progress = { fraction },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = if (fraction > 0.9f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(6.dp))
                 Text(
-                    "${formatSize(root.used)} utilisés sur ${formatSize(root.total)} · ${formatSize(root.free)} libres",
+                    "${formatSize(root.used)} / ${formatSize(root.total)} · ${formatSize(root.free)} libres",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -297,42 +439,156 @@ private fun StorageCard(root: StorageRoot, onClick: () -> Unit) {
 }
 
 @Composable
-private fun CategoryButton(entry: CategoryEntry, modifier: Modifier, onClick: () -> Unit) {
+private fun SectionTitle(text: String, action: String? = null, onAction: () -> Unit = {}) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 8.dp, top = 24.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        if (action != null) {
+            Text(
+                action,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable(onClick = onAction)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryTile(category: Category, stat: MediaQueries.Stat?, modifier: Modifier, onClick: () -> Unit) {
+    val style = category.style()
     Column(
         modifier
+            .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        FilledTonalIconButton(
-            onClick = onClick,
-            modifier = Modifier.size(56.dp),
-            shape = CircleShape,
-            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = entry.color.copy(alpha = 0.15f),
-                contentColor = entry.color,
-            ),
+        Box(
+            Modifier
+                .size(60.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(style.color.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center,
         ) {
-            Icon(entry.icon, contentDescription = null)
+            Icon(style.icon, contentDescription = null, tint = style.color, modifier = Modifier.size(28.dp))
         }
         Text(
-            entry.category.label,
-            style = MaterialTheme.typography.labelMedium,
+            category.label,
+            style = MaterialTheme.typography.labelLarge,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Text(
+            stat?.let { if (category == Category.LARGE) formatSize(it.bytes) else String.format(Locale.FRANCE, "%,d", it.count) } ?: " ",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-private fun ShortcutChip(label: String, icon: ImageVector, onClick: () -> Unit) {
-    Card(onClick = onClick) {
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
-            Text(label, modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelLarge)
+private fun ShortcutChip(shortcut: Shortcut, onClick: () -> Unit) {
+    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Row(Modifier.padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(shortcut.icon, null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            Text(shortcut.label, modifier = Modifier.padding(start = 10.dp), style = MaterialTheme.typography.labelLarge)
         }
     }
 }
 
+@Composable
+private fun RecentCard(item: FileItem, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .width(112.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(onClick = onClick),
+    ) {
+        FileThumbnail(item, Modifier.size(112.dp), iconSize = 40)
+        Text(
+            item.name,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp, start = 2.dp, end = 2.dp),
+        )
+        Text(
+            formatSize(item.size),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 2.dp),
+        )
+    }
+}
+
+@Composable
+private fun FavoriteRow(path: String, onClick: () -> Unit, onLongClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(44.dp)
+                .background(Color(0xFFFFB300).copy(alpha = 0.16f), RoundedCornerShape(14.dp)),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Filled.Star, null, tint = Color(0xFFFFA000)) }
+        Column(Modifier.padding(start = 14.dp)) {
+            Text(File(path).name.ifEmpty { path }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(
+                path,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ToolCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    brush: Brush,
+    content: Color,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier
+            .clip(MaterialTheme.shapes.large)
+            .background(brush)
+            .clickable(onClick = onClick)
+            .padding(18.dp),
+    ) {
+        Icon(icon, null, tint = content, modifier = Modifier.size(28.dp))
+        Spacer(Modifier.height(18.dp))
+        Text(title, style = MaterialTheme.typography.titleMedium, color = content)
+        Text(subtitle, style = MaterialTheme.typography.bodySmall, color = content.copy(alpha = 0.75f))
+    }
+}
