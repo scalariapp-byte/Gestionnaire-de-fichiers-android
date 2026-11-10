@@ -293,6 +293,9 @@ class ScreenshotTest {
     }
 
     @Test fun settings() = capture("08_parametres") { SettingsScreen(onBack = {}) }
+    /** Écran des paramètres en entier (écran très haut). */
+    @Config(sdk = [34], qualifiers = "w411dp-h1900dp-xxhdpi")
+    @Test fun settings_full() = capture("18_parametres_complet") { SettingsScreen(onBack = {}) }
     @Test fun share_qr() = capture("17_partage_qr") { androidx.compose.material3.Surface(Modifier.padding(24.dp), shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
             Column(Modifier.padding(24.dp)) {
                 Text("Télécharger Mes fichiers", style = MaterialTheme.typography.headlineSmall)

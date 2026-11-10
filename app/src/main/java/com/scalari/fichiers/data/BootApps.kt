@@ -19,8 +19,6 @@ data class BootApp(
     /** Application désactivée dans les réglages. */
     val isDisabled: Boolean,
     val receivers: Int,
-    /** Récepteurs de démarrage désactivés (blocage fait via Isolateur). */
-    val isBlocked: Boolean = false,
 )
 
 /** Applications qui demandent à être lancées au démarrage du téléphone. */
@@ -57,12 +55,6 @@ object BootApps {
                 isStopped = ai.flags and ApplicationInfo.FLAG_STOPPED != 0,
                 isDisabled = !ai.enabled,
                 receivers = receivers.size,
-                isBlocked = receivers.all { cls ->
-                    runCatching {
-                        pm.getComponentEnabledSetting(android.content.ComponentName(pkg, cls)) ==
-                            PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                    }.getOrDefault(false)
-                },
             )
         }.sortedWith(compareBy<BootApp> { it.isSystem }.thenBy { it.label.lowercase() })
     }
