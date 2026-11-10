@@ -476,7 +476,7 @@ private fun UnlockedContent(entries: List<VaultEntry>, navigator: AppNavigator, 
                 ) {
                     Icon(Icons.Filled.Shield, null, Modifier.size(80.dp), tint = MaterialTheme.colorScheme.outline)
                     Text(
-                        "Le coffre est vide.\nDans l'explorateur, appuyez longuement sur des fichiers puis menu ⋮ → « Mettre au coffre-fort ».",
+                        "Le coffre est vide.\nDans l'explorateur, appuyez longuement sur des fichiers puis Plus → « Mettre au coffre-fort ».",
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
