@@ -92,7 +92,7 @@ class StorageWidget : AppWidgetProvider() {
             val base = Environment.getExternalStorageDirectory()
             val defaults = listOf(
                 File(base, Environment.DIRECTORY_DOWNLOADS) to "Téléchargements",
-                File(base, Environment.DIRECTORY_DCIM) to "Appareil photo",
+                File(base, Environment.DIRECTORY_DCIM) to "Photos",
                 File(base, Environment.DIRECTORY_DOCUMENTS) to "Documents",
                 File(base, Environment.DIRECTORY_MUSIC) to "Musique",
             )
