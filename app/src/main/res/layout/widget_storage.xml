@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:padding="14dp">
+    android:padding="12dp">
 
     <LinearLayout
         android:id="@+id/widget_header"
@@ -32,8 +32,17 @@
                 android:maxLines="1"
                 android:text="Mes fichiers"
                 android:textColor="@color/widget_text"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
+            <TextView
+                android:id="@+id/widget_detail"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:maxLines="1"
+                android:text="Stockage interne"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="12sp" />
         </LinearLayout>
 
         <ProgressBar
@@ -41,26 +50,17 @@
             style="@android:style/Widget.ProgressBar.Horizontal"
             android:layout_width="match_parent"
             android:layout_height="6dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:max="100"
             android:progress="0"
             android:progressDrawable="@drawable/widget_progress" />
 
-        <TextView
-            android:id="@+id/widget_detail"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:maxLines="1"
-            android:text="Stockage interne"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="12sp" />
     </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="10dp"
         android:orientation="horizontal">
         <LinearLayout
             android:id="@+id/widget_slot1"
@@ -71,27 +71,27 @@
             android:background="@drawable/widget_tile"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:paddingStart="4dp"
             android:paddingEnd="4dp">
             <ImageView
                 android:id="@+id/widget_slot1_icon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_widget_folder" />
             <TextView
                 android:id="@+id/widget_slot1_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:ellipsize="end"
                 android:gravity="center"
                 android:maxLines="1"
                 android:text="Dossier"
                 android:textColor="@color/widget_text"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
         </LinearLayout>
         <LinearLayout
             android:id="@+id/widget_slot2"
@@ -102,27 +102,27 @@
             android:background="@drawable/widget_tile"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:paddingStart="4dp"
             android:paddingEnd="4dp">
             <ImageView
                 android:id="@+id/widget_slot2_icon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_widget_folder" />
             <TextView
                 android:id="@+id/widget_slot2_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:ellipsize="end"
                 android:gravity="center"
                 android:maxLines="1"
                 android:text="Dossier"
                 android:textColor="@color/widget_text"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
         </LinearLayout>
         <LinearLayout
             android:id="@+id/widget_slot3"
@@ -133,27 +133,27 @@
             android:background="@drawable/widget_tile"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:paddingStart="4dp"
             android:paddingEnd="4dp">
             <ImageView
                 android:id="@+id/widget_slot3_icon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_widget_folder" />
             <TextView
                 android:id="@+id/widget_slot3_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:ellipsize="end"
                 android:gravity="center"
                 android:maxLines="1"
                 android:text="Dossier"
                 android:textColor="@color/widget_text"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
         </LinearLayout>
         <LinearLayout
             android:id="@+id/widget_slot4"
@@ -164,27 +164,27 @@
             android:background="@drawable/widget_tile"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:paddingStart="4dp"
             android:paddingEnd="4dp">
             <ImageView
                 android:id="@+id/widget_slot4_icon"
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_widget_folder" />
             <TextView
                 android:id="@+id/widget_slot4_label"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:ellipsize="end"
                 android:gravity="center"
                 android:maxLines="1"
                 android:text="Dossier"
                 android:textColor="@color/widget_text"
-                android:textSize="11sp" />
+                android:textSize="10sp" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -300,7 +301,7 @@ class ScreenshotTest {
                 factory = { ctx ->
                     android.view.LayoutInflater.from(ctx).inflate(R.layout.widget_storage, null).apply {
                         findViewById<android.widget.TextView>(R.id.widget_free).text = "46,3 Go libres"
-                        findViewById<android.widget.TextView>(R.id.widget_detail).text = "63 % utilisés sur 128 Go"
+                        findViewById<android.widget.TextView>(R.id.widget_detail).text = "63 % de 128 Go"
                         findViewById<android.widget.ProgressBar>(R.id.widget_progress).progress = 63
                         listOf(
                             Triple(R.id.widget_slot1_label, R.id.widget_slot1_icon, "Téléchargements" to R.drawable.ic_widget_download),
@@ -313,7 +314,7 @@ class ScreenshotTest {
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(150.dp),
+                modifier = Modifier.width(300.dp).height(120.dp),
             )
         }
     }

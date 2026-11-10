@@ -84,7 +84,7 @@ class StorageWidget : AppWidgetProvider() {
                 val percent = (root.used * 100 / root.total).toInt().coerceIn(0, 100)
                 views.setProgressBar(R.id.widget_progress, 100, percent, false)
                 views.setTextViewText(R.id.widget_free, "${formatSize(root.free)} libres")
-                views.setTextViewText(R.id.widget_detail, "$percent % utilisés sur ${formatSize(root.total)}")
+                views.setTextViewText(R.id.widget_detail, "$percent % de ${formatSize(root.total)}")
             }
             views.setOnClickPendingIntent(R.id.widget_header, openIntent(context, null, 0))
 
