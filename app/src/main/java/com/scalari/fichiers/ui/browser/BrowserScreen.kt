@@ -218,9 +218,9 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
     fun sendToDrive(files: List<File>) {
         when (com.scalari.fichiers.ui.GoogleDrive.upload(context, files)) {
             com.scalari.fichiers.ui.GoogleDrive.Upload.SENT -> {
-                if (files.any { it.isDirectory }) message("Dossiers ignorés : compressez-les d'abord (⋮ → Compresser)")
+                if (files.any { it.isDirectory }) message("Dossiers ignorés : compressez-les d'abord (Plus → Compresser)")
             }
-            com.scalari.fichiers.ui.GoogleDrive.Upload.NO_FILES -> message("Les dossiers ne s'envoient pas tels quels : compressez-les d'abord (⋮ → Compresser)")
+            com.scalari.fichiers.ui.GoogleDrive.Upload.NO_FILES -> message("Les dossiers ne s'envoient pas tels quels : compressez-les d'abord (Plus → Compresser)")
             com.scalari.fichiers.ui.GoogleDrive.Upload.NOT_INSTALLED -> {
                 message("Google Drive n'est pas installé")
                 com.scalari.fichiers.ui.GoogleDrive.openPlayStore(context)

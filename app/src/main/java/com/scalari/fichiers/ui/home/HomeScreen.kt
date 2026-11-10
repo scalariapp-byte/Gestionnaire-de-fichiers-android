@@ -255,7 +255,7 @@ fun HomeContent(
         Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ShortcutTile(
                 Shortcut("Importer", Icons.Filled.CloudDownload, "", Color(0xFF1A73E8)),
-                count = null, subtitle = "Vers Téléchargements",
+                count = null, subtitle = "Depuis Drive",
                 modifier = Modifier.weight(1f), onClick = actions.onDriveImport, onLongClick = null,
             )
             ShortcutTile(
@@ -265,7 +265,7 @@ fun HomeContent(
             )
         }
         Text(
-            "Pour envoyer : dans l'explorateur, sélectionnez des fichiers → ⋮ → Envoyer vers Google Drive.",
+            "Les fichiers importés arrivent dans Téléchargements. Pour envoyer : dans l'explorateur, sélectionnez des fichiers → Plus → Envoyer vers Google Drive.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
