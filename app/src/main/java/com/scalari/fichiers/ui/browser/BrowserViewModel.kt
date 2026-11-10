@@ -257,7 +257,7 @@ class BrowserViewModel(app: Application, startPath: String?, openSearch: Boolean
         viewModelScope.launch {
             val wasFavorite = path in settings.value.favorites
             FileManagerApp.instance.settings.toggleFavorite(path)
-            _messages.tryEmit(if (wasFavorite) "Retiré des favoris" else "Ajouté aux favoris")
+            _messages.tryEmit(if (wasFavorite) "Retiré du widget" else "Épinglé sur le widget d'écran d'accueil")
         }
     }
 }

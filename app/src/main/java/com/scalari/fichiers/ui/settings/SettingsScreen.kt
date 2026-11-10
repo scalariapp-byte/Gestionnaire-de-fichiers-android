@@ -23,7 +23,6 @@ import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ColorLens
-import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -31,7 +30,6 @@ import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Screenshot
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.SystemUpdate
@@ -174,25 +172,15 @@ fun SettingsScreen(onBack: () -> Unit) {
                 ) { scope.launch { UpdateManager.check(context, force = true, manual = true) } }
             }
 
-            Group("Partager l'application") {
-                Item(Icons.Outlined.Share, "Envoyer le lien de téléchargement", APP_DOWNLOAD_URL.removePrefix("https://"), first = true) {
-                    ShareApp.share(context)
-                }
-                Item(Icons.Outlined.ContentCopy, "Copier le lien", null) {
-                    ShareApp.copy(context)
-                    Toast.makeText(context, "Lien copié", Toast.LENGTH_SHORT).show()
-                }
-                Item(Icons.Outlined.QrCode2, "Afficher le QR code", "À scanner avec un autre téléphone") { qrDialog = true }
-            }
-
             Group("À propos") {
+                Item(Icons.Outlined.Share, "Partager l'application", "Lien, QR code, envoi par message", first = true) { qrDialog = true }
                 val needsAccess = StoragePermission.needsAllFilesAccess()
                 if (needsAccess) {
-                    Item(Icons.Outlined.FolderOpen, "Accès à tous les fichiers", "Ouvrir les réglages Android", first = true) {
+                    Item(Icons.Outlined.FolderOpen, "Accès à tous les fichiers", "Ouvrir les réglages Android") {
                         StoragePermission.openAllFilesSettings(context)
                     }
                 }
-                Item(Icons.Outlined.NewReleases, "Nouveautés", "Notes de version sur GitHub", first = !needsAccess) {
+                Item(Icons.Outlined.NewReleases, "Nouveautés", "Notes de version sur GitHub") {
                     UpdateManager.openReleasePage(context, null)
                 }
                 Item(Icons.Outlined.Info, "Mes fichiers", "Version ${BuildConfig.VERSION_NAME}", onClick = null)
@@ -201,7 +189,7 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    if (qrDialog) QrCodeDialog(onDismiss = { qrDialog = false })
+    if (qrDialog) ShareAppDialog(onDismiss = { qrDialog = false })
     if (lockDialog) {
         ChoiceDialog(
             title = "Verrouiller le coffre",

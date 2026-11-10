@@ -13,8 +13,8 @@ android {
         applicationId = "com.scalari.fichiers"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "1.18.0"
+        versionCode = 24
+        versionName = "1.19.0"
 
         // Téléphones uniquement (ARM) : n'embarque pas les bibliothèques natives pour émulateurs x86.
         ndk {

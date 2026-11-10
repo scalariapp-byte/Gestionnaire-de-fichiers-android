@@ -2,6 +2,8 @@
 
 package com.scalari.fichiers.ui.home
 
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDownload
 import android.os.Environment
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -146,6 +148,8 @@ class HomeActions(
     val onInstallUpdate: (com.scalari.fichiers.update.Release) -> Unit = {},
     val onDismissUpdate: () -> Unit = {},
     val onOpenUpdatePage: (com.scalari.fichiers.update.Release?) -> Unit = {},
+    val onDriveImport: () -> Unit = {},
+    val onOpenDrive: () -> Unit = {},
 )
 
 @Composable
@@ -164,7 +168,21 @@ fun HomeScreen(navigator: AppNavigator) {
         scope.launch { com.scalari.fichiers.update.UpdateManager.check(context) }
     }
 
+    val downloads = remember { File(Environment.getExternalStorageDirectory(), Environment.DIRECTORY_DOWNLOADS) }
+    val driveImport = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            downloads.mkdirs()
+            com.scalari.fichiers.data.OperationManager.importUris(uris, downloads)
+        }
+    }
     val actions = HomeActions(
+        onDriveImport = { runCatching { driveImport.launch(arrayOf("*/*")) } },
+        onOpenDrive = {
+            val launch = context.packageManager.getLaunchIntentForPackage(com.scalari.fichiers.ui.GoogleDrive.PACKAGE)
+            if (launch != null) context.startActivity(launch) else com.scalari.fichiers.ui.GoogleDrive.openPlayStore(context)
+        },
         onSearch = { navigator.browser(null, search = true) },
         onSettings = navigator::settings,
         onOpenPath = { navigator.browser(it) },
@@ -233,29 +251,25 @@ fun HomeContent(
             }
         }
 
-        SectionTitle("Accès rapide")
-        val tiles = favorites.map { path ->
-            Shortcut(File(path).name.ifEmpty { path }, Icons.Filled.Star, path, Color(0xFFFFA000)) to true
-        } + shortcuts.map { it to false }
-        Column(
-            Modifier.padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            tiles.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    row.forEach { (s, isFavorite) ->
-                        ShortcutTile(
-                            shortcut = s,
-                            count = counts[s.path],
-                            modifier = Modifier.weight(1f),
-                            onClick = { actions.onOpenPath(s.path) },
-                            onLongClick = if (isFavorite) ({ actions.onRemoveFavorite(s.path) }) else null,
-                        )
-                    }
-                    repeat(2 - row.size) { Spacer(Modifier.weight(1f)) }
-                }
-            }
+        SectionTitle("Google Drive")
+        Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            ShortcutTile(
+                Shortcut("Importer", Icons.Filled.CloudDownload, "", Color(0xFF1A73E8)),
+                count = null, subtitle = "Vers Téléchargements",
+                modifier = Modifier.weight(1f), onClick = actions.onDriveImport, onLongClick = null,
+            )
+            ShortcutTile(
+                Shortcut("Ouvrir Drive", Icons.Filled.Cloud, "", Color(0xFF0F9D58)),
+                count = null, subtitle = "Appli Google Drive",
+                modifier = Modifier.weight(1f), onClick = actions.onOpenDrive, onLongClick = null,
+            )
         }
+        Text(
+            "Pour envoyer : dans l'explorateur, sélectionnez des fichiers → ⋮ → Envoyer vers Google Drive.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
     }
 }
 
@@ -457,6 +471,7 @@ private fun ShortcutTile(
     modifier: Modifier,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
+    subtitle: String? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
     Row(
@@ -479,7 +494,7 @@ private fun ShortcutTile(
         Column(Modifier.padding(start = 12.dp)) {
             Text(shortcut.label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                when (count) {
+                subtitle ?: when (count) {
                     null -> " "
                     0 -> "Vide"
                     1 -> "1 élément"

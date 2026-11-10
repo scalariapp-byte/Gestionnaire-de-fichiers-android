@@ -241,6 +241,58 @@ object OperationManager {
 
     // ---------------------------------------------------------------- Archives ZIP
 
+    /**
+     * Importe des documents choisis dans le sélecteur Android (Google Drive, autre cloud, clé USB…)
+     * dans [targetDir]. Les fichiers Drive sont téléchargés à la volée par le fournisseur.
+     */
+    fun importUris(uris: List<android.net.Uri>, targetDir: File) = run("Import") { touched ->
+        val resolver = FileManagerApp.instance.contentResolver
+        data class Doc(val uri: android.net.Uri, val name: String, val size: Long)
+        val docs = uris.map { uri ->
+            var name: String? = null
+            var size = -1L
+            runCatching {
+                resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) {
+                        name = c.getString(0)
+                        if (!c.isNull(1)) size = c.getLong(1)
+                    }
+                }
+            }
+            Doc(uri, (name ?: uri.lastPathSegment?.substringAfterLast('/') ?: "fichier").replace('/', '_'), size)
+        }
+        val t = Tracker("Import", docs.sumOf { it.size.coerceAtLeast(0) }, docs.size)
+        var done = 0
+        for (doc in docs) {
+            currentCoroutineContext().ensureActive()
+            val target = FileOps.uniqueFile(targetDir, doc.name)
+            t.update(doc.name, force = true)
+            try {
+                val input = resolver.openInputStream(doc.uri) ?: throw IOException("Impossible d'ouvrir ${doc.name}")
+                input.use { inp ->
+                    target.outputStream().use { out ->
+                        val buffer = ByteArray(256 * 1024)
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            val n = inp.read(buffer)
+                            if (n < 0) break
+                            out.write(buffer, 0, n)
+                            t.bytes += n
+                            t.update(doc.name)
+                        }
+                    }
+                }
+            } catch (e: Throwable) {
+                target.delete()
+                throw e
+            }
+            touched += target.absolutePath
+            done++
+            t.items = done
+        }
+        "${plural(done, "fichier")} importé${if (done > 1) "s" else ""} dans ${targetDir.name.ifEmpty { "/" }}"
+    }
+
     fun compress(files: List<File>, zipFile: File) = run("Compression") { touched ->
         val baseDir = files.first().parentFile
         val t = Tracker("Compression", files.sumOf { FileOps.sizeOf(it) }, files.size)

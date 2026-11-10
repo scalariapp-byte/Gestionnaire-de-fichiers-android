@@ -2,6 +2,10 @@
 
 package com.scalari.fichiers.ui.browser
 
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -207,6 +211,22 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
     }
 
     fun message(text: String) { scope.launch { snackbar.showSnackbar(text) } }
+    // Import depuis Google Drive (ou tout autre fournisseur du sélecteur Android) vers le dossier courant.
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) OperationManager.importUris(uris, state.currentDir)
+    }
+    fun sendToDrive(files: List<File>) {
+        when (com.scalari.fichiers.ui.GoogleDrive.upload(context, files)) {
+            com.scalari.fichiers.ui.GoogleDrive.Upload.SENT -> {
+                if (files.any { it.isDirectory }) message("Dossiers ignorés : compressez-les d'abord (⋮ → Compresser)")
+            }
+            com.scalari.fichiers.ui.GoogleDrive.Upload.NO_FILES -> message("Les dossiers ne s'envoient pas tels quels : compressez-les d'abord (⋮ → Compresser)")
+            com.scalari.fichiers.ui.GoogleDrive.Upload.NOT_INSTALLED -> {
+                message("Google Drive n'est pas installé")
+                com.scalari.fichiers.ui.GoogleDrive.openPlayStore(context)
+            }
+        }
+    }
 
     fun open(item: FileItem) {
         when {
@@ -285,9 +305,14 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                                 if (settings.showHidden) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                             ) { menu = false; scope.launch { repo.setShowHidden(!settings.showHidden) } }
                             MenuItem(
-                                if (isFav) "Retirer des favoris" else "Ajouter aux favoris",
+                                if (isFav) "Retirer du widget" else "Épingler sur le widget",
                                 if (isFav) Icons.Filled.Star else Icons.Filled.StarBorder,
                             ) { menu = false; vm.toggleFavorite(state.currentDir.absolutePath) }
+                            MenuItem("Importer depuis Google Drive", Icons.Filled.CloudDownload) {
+                                menu = false
+                                runCatching { importLauncher.launch(arrayOf("*/*")) }
+                                    .onFailure { message("Sélecteur de fichiers indisponible") }
+                            }
                             MenuItem("Tout sélectionner", Icons.Filled.SelectAll) { menu = false; vm.selectAll() }
                             MenuItem("Propriétés du dossier", Icons.Filled.Info) {
                                 menu = false; dialog = BrowserDialog.Properties(listOf(state.currentDir))
@@ -321,6 +346,7 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                     },
                     onToggleFavorite = { item -> vm.toggleFavorite(item.path); vm.clearSelection() },
                     onVault = { dialog = BrowserDialog.Vault(vm.selectedFiles()) },
+                    onDrive = { sendToDrive(vm.selectedFiles()); vm.clearSelection() },
                 )
             }
             if (c != null && !state.selectionMode) {
@@ -585,6 +611,7 @@ fun SelectionToolbar(
     onOpenWith: (FileItem) -> Unit,
     onToggleFavorite: (FileItem) -> Unit,
     onVault: () -> Unit,
+    onDrive: () -> Unit = {},
 ) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
@@ -614,11 +641,12 @@ fun SelectionToolbar(
                         } else {
                             val fav = isFavorite(single.path)
                             MenuItem(
-                                if (fav) "Retirer des favoris" else "Ajouter aux favoris",
+                                if (fav) "Retirer du widget" else "Épingler sur le widget",
                                 if (fav) Icons.Filled.Star else Icons.Filled.StarBorder,
                             ) { menu = false; onToggleFavorite(single) }
                         }
                     }
+                    MenuItem("Envoyer vers Google Drive", Icons.Filled.CloudUpload) { menu = false; onDrive() }
                     MenuItem("Mettre au coffre-fort", Icons.Filled.Lock) { menu = false; onVault() }
                     MenuItem("Compresser (ZIP)", Icons.Filled.Archive) { menu = false; onCompress() }
                     MenuItem("Propriétés", Icons.Filled.Info) { menu = false; onProperties() }
