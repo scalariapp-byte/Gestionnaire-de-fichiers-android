@@ -2,6 +2,7 @@
 
 package com.scalari.fichiers.ui.analyzer
 
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -171,6 +172,7 @@ fun AnalyzerScreen(navigator: AppNavigator, initialRoot: String? = null) {
                 onDuplicates = { root?.let { navigator.analyzerDuplicates(it.path.absolutePath) } },
                 onApks = navigator::analyzerApks,
                 onEmpty = { root?.let { navigator.analyzerEmpty(it.path.absolutePath) } },
+                onLeftovers = navigator::analyzerLeftovers,
                 onLarge = { navigator.category(Category.LARGE) },
                 onBootApps = navigator::bootApps,
             )
@@ -188,6 +190,7 @@ fun AnalyzerContent(
     onDuplicates: () -> Unit = {},
     onApks: () -> Unit = {},
     onEmpty: () -> Unit = {},
+    onLeftovers: () -> Unit = {},
     onLarge: () -> Unit = {},
     onBootApps: () -> Unit = {},
 ) {
@@ -257,6 +260,7 @@ fun AnalyzerContent(
         ToolRow(Icons.Filled.Storage, Color(0xFFF07A1A), "Gros fichiers", "Fichiers de plus de 50 Mo", onLarge)
         ToolRow(Icons.Filled.Android, Color(0xFF5BA33B), "APK déjà installés", "Fichiers d'installation devenus inutiles", onApks)
         ToolRow(Icons.Filled.FolderOff, Color(0xFF607D8B), "Dossiers vides", "Dossiers sans aucun contenu", onEmpty)
+        ToolRow(Icons.Filled.DeleteSweep, Color(0xFF8E4EC6), "Résidus d'applis désinstallées", "Dossiers laissés par des applis supprimées", onLeftovers)
         Text("Système", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
         ToolRow(Icons.Filled.PowerSettingsNew, Color(0xFF0E9AA7), "Démarrage automatique", "Applis lancées au démarrage du téléphone", onBootApps)
     }
@@ -578,3 +582,33 @@ fun EmptyFoldersScreen(navigator: AppNavigator, rootPath: String) {
     )
 }
 
+
+@Composable
+fun LeftoversScreen(navigator: AppNavigator) {
+    val context = LocalContext.current
+    CleanupScreen(
+        title = "Résidus d'applis",
+        navigator = navigator,
+        emptyText = "Aucun résidu trouvé : tous les dossiers d'applis correspondent à des applis installées.",
+        load = { onProgress ->
+            onProgress("Comparaison des dossiers avec les applis installées…")
+            val found = withContext(Dispatchers.IO) { com.scalari.fichiers.data.AppLeftovers.scan(context) }
+            if (found == null) {
+                // Liste des applis inaccessible : ne rien proposer plutôt que risquer une erreur.
+                emptyList<CleanupItem>() to emptySet()
+            } else {
+                val items = found.map {
+                    CleanupItem(
+                        file = it.dir,
+                        title = it.dir.name,
+                        subtitle = "${formatSize(it.size)} · ${it.reason}",
+                        size = it.size,
+                        group = if (it.sure) 0 else 1,
+                        groupLabel = if (it.sure) "Applis désinstallées" else "Probables · vérifiez le contenu avant de supprimer",
+                    )
+                }
+                items to found.filter { it.sure }.mapTo(HashSet()) { it.dir.absolutePath }
+            }
+        },
+    )
+}

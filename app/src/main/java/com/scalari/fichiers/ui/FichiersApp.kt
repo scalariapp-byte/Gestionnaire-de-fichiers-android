@@ -78,6 +78,7 @@ object Routes {
     const val ANALYZER_FOLDERS = "analyzer/folders?path={path}"
     const val ANALYZER_DUPLICATES = "analyzer/duplicates?root={root}"
     const val ANALYZER_APKS = "analyzer/apks"
+    const val ANALYZER_LEFTOVERS = "analyzer/leftovers"
     const val ANALYZER_EMPTY = "analyzer/empty?root={root}"
     const val BOOT_APPS = "boot-apps"
     const val PLAYER = "player?path={path}&secure={secure}"
@@ -121,6 +122,7 @@ class AppNavigator(private val nav: NavHostController) {
     fun analyzerFolders(path: String?) = nav.navigate("analyzer/folders?path=${Uri.encode(path ?: "")}")
     fun analyzerDuplicates(root: String) = nav.navigate("analyzer/duplicates?root=${Uri.encode(root)}")
     fun analyzerApks() = nav.navigate(Routes.ANALYZER_APKS)
+    fun analyzerLeftovers() = nav.navigate(Routes.ANALYZER_LEFTOVERS)
     fun analyzerEmpty(root: String) = nav.navigate("analyzer/empty?root=${Uri.encode(root)}")
     fun bootApps() = nav.navigate(Routes.BOOT_APPS)
     fun player(path: String, secure: Boolean = false) = nav.navigate(Routes.player(path, secure)) { launchSingleTop = true }
@@ -294,6 +296,7 @@ private fun AppNavHost() {
             DuplicatesScreen(navigator, e.arguments?.getString("root").orEmpty())
         }
         composable(Routes.ANALYZER_APKS) { InstalledApksScreen(navigator) }
+        composable(Routes.ANALYZER_LEFTOVERS) { com.scalari.fichiers.ui.analyzer.LeftoversScreen(navigator) }
         composable(Routes.ANALYZER_EMPTY, arguments = listOf(navArgument("root") { type = NavType.StringType; nullable = true; defaultValue = null })) { e ->
             EmptyFoldersScreen(navigator, e.arguments?.getString("root").orEmpty())
         }
