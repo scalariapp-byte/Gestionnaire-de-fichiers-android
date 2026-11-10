@@ -116,12 +116,16 @@ fun SortDialog(
     sortBy: SortBy,
     ascending: Boolean,
     foldersFirst: Boolean,
+    /** Nom du dossier courant : affiche l'option « Seulement pour ce dossier ». */
+    folderName: String? = null,
+    folderOnly: Boolean = false,
     onDismiss: () -> Unit,
-    onApply: (SortBy, Boolean, Boolean) -> Unit,
+    onApply: (SortBy, Boolean, Boolean, Boolean) -> Unit,
 ) {
     var by by remember { mutableStateOf(sortBy) }
     var asc by remember { mutableStateOf(ascending) }
     var folders by remember { mutableStateOf(foldersFirst) }
+    var onlyHere by remember { mutableStateOf(folderOnly) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Trier par") },
@@ -143,9 +147,20 @@ fun SortDialog(
                     Checkbox(checked = folders, onCheckedChange = { folders = it })
                     Text("Dossiers en premier")
                 }
+                if (folderName != null) {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onlyHere = !onlyHere },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(checked = onlyHere, onCheckedChange = { onlyHere = it })
+                        Text("Seulement pour « $folderName »", maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                }
             }
         },
-        confirmButton = { TextButton(onClick = { onApply(by, asc, folders) }) { Text("Appliquer") } },
+        confirmButton = { TextButton(onClick = { onApply(by, asc, folders, onlyHere) }) { Text("Appliquer") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Annuler") } },
     )
 }

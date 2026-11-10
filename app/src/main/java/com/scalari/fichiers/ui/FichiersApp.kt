@@ -1,5 +1,6 @@
 package com.scalari.fichiers.ui
 
+import com.scalari.fichiers.FileManagerApp
 import android.net.Uri
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -143,8 +144,10 @@ fun FichiersApp() {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(StoragePermission.isGranted(context)) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { granted = StoragePermission.isGranted(context) }
+    val lockDelay = FileManagerApp.instance.settingsState.collectAsStateWithLifecycle().value.vaultLockDelay.seconds
+    LifecycleEventEffect(Lifecycle.Event.ON_START) { VaultManager.onAppForeground(context, lockDelay) }
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-        if (VaultManager.externalOpen) VaultManager.externalOpen = false else VaultManager.lock(context)
+        if (VaultManager.externalOpen) VaultManager.externalOpen = false else VaultManager.onAppBackground(context, lockDelay)
     }
 
     val snackbar = remember { SnackbarHostState() }
@@ -182,6 +185,13 @@ fun FichiersApp() {
 private fun AppNavHost() {
     val nav = rememberNavController()
     val navigator = remember(nav) { AppNavigator(nav) }
+    // Ouverture d'un dossier demandée de l'extérieur (widget d'écran d'accueil).
+    val openRequest by com.scalari.fichiers.widget.OpenRequests.path.collectAsStateWithLifecycle()
+    LaunchedEffect(openRequest) {
+        val path = openRequest ?: return@LaunchedEffect
+        com.scalari.fichiers.widget.OpenRequests.consume()
+        navigator.browser(path)
+    }
     val pathArg = navArgument("path") {
         type = NavType.StringType
         nullable = true

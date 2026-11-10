@@ -17,6 +17,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) com.scalari.fichiers.widget.OpenRequests.handle(intent)
         setContent {
             val settings by FileManagerApp.instance.settingsState.collectAsStateWithLifecycle()
             val dark = isAppInDarkTheme(settings)
@@ -31,5 +32,10 @@ class MainActivity : FragmentActivity() {
                 FichiersApp()
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        com.scalari.fichiers.widget.OpenRequests.handle(intent)
     }
 }

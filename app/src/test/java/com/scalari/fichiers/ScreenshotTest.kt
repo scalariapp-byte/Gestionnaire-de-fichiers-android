@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -293,6 +294,29 @@ class ScreenshotTest {
     }
 
     @Test fun settings() = capture("08_parametres") { SettingsScreen(onBack = {}) }
+    @Test fun widget() = capture("19_widget") {
+        androidx.compose.foundation.layout.Box(Modifier.padding(16.dp)) {
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { ctx ->
+                    android.view.LayoutInflater.from(ctx).inflate(R.layout.widget_storage, null).apply {
+                        findViewById<android.widget.TextView>(R.id.widget_free).text = "46,3 Go libres"
+                        findViewById<android.widget.TextView>(R.id.widget_detail).text = "63 % utilisés sur 128 Go"
+                        findViewById<android.widget.ProgressBar>(R.id.widget_progress).progress = 63
+                        listOf(
+                            Triple(R.id.widget_slot1_label, R.id.widget_slot1_icon, "Téléchargements" to R.drawable.ic_widget_download),
+                            Triple(R.id.widget_slot2_label, R.id.widget_slot2_icon, "Appareil photo" to R.drawable.ic_widget_camera),
+                            Triple(R.id.widget_slot3_label, R.id.widget_slot3_icon, "Travail" to R.drawable.ic_widget_folder),
+                            Triple(R.id.widget_slot4_label, R.id.widget_slot4_icon, "Musique" to R.drawable.ic_widget_music),
+                        ).forEach { (label, icon, v) ->
+                            findViewById<android.widget.TextView>(label).text = v.first
+                            findViewById<android.widget.ImageView>(icon).setImageResource(v.second)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(150.dp),
+            )
+        }
+    }
     /** Écran des paramètres en entier (écran très haut). */
     @Config(sdk = [34], qualifiers = "w411dp-h1900dp-xxhdpi")
     @Test fun settings_full() = capture("18_parametres_complet") { SettingsScreen(onBack = {}) }

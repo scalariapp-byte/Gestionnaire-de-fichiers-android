@@ -17,6 +17,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.AutoDelete
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ColorLens
@@ -65,6 +68,8 @@ import com.scalari.fichiers.BuildConfig
 import com.scalari.fichiers.FileManagerApp
 import com.scalari.fichiers.data.StoragePermission
 import com.scalari.fichiers.data.ThemeMode
+import com.scalari.fichiers.data.TrashRetention
+import com.scalari.fichiers.data.VaultLockDelay
 import com.scalari.fichiers.ui.components.RadioRow
 import com.scalari.fichiers.update.UpdateManager
 import com.scalari.fichiers.update.UpdateState
@@ -78,6 +83,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     var themeDialog by remember { mutableStateOf(false) }
     var qrDialog by remember { mutableStateOf(false) }
+    var lockDialog by remember { mutableStateOf(false) }
+    var trashDialog by remember { mutableStateOf(false) }
     val update by UpdateManager.state.collectAsStateWithLifecycle()
     var autoUpdate by remember { mutableStateOf(UpdateManager.isAutoCheckEnabled(context)) }
 
@@ -114,19 +121,36 @@ fun SettingsScreen(onBack: () -> Unit) {
                 SwitchItem(Icons.Outlined.Visibility, "Fichiers cachés", "Afficher ceux qui commencent par « . »", settings.showHidden) {
                     scope.launch { repo.setShowHidden(it) }
                 }
+                val custom = settings.folderViews.size
+                Item(
+                    Icons.AutoMirrored.Outlined.Sort,
+                    "Tri par dossier",
+                    if (custom == 0) "Trier → « Seulement pour ce dossier » dans l'explorateur"
+                    else "$custom dossier(s) avec leur propre tri · toucher pour tout réinitialiser",
+                    onClick = if (custom == 0) null else ({
+                        scope.launch { repo.clearFolderViews() }
+                        Toast.makeText(context, "Tous les dossiers suivent le tri général", Toast.LENGTH_SHORT).show()
+                    }),
+                )
             }
 
             Group("Suppression") {
                 SwitchItem(Icons.Outlined.Delete, "Corbeille", "Les éléments supprimés restent restaurables", settings.useTrash, first = true) {
                     scope.launch { repo.setUseTrash(it) }
                 }
+                Item(Icons.Outlined.AutoDelete, "Vider automatiquement la corbeille", settings.trashRetention.let {
+                    if (it.days == 0) it.label else "Éléments supprimés après ${it.label}"
+                }) { trashDialog = true }
                 SwitchItem(Icons.Outlined.CheckCircle, "Demander confirmation", "Avant chaque suppression", settings.confirmDelete) {
                     scope.launch { repo.setConfirmDelete(it) }
                 }
             }
 
             Group("Coffre-fort") {
-                SwitchItem(Icons.Outlined.Screenshot, "Captures d'écran", "Autoriser captures et enregistrement d'écran", settings.vaultScreenshots, first = true) {
+                Item(Icons.Outlined.Lock, "Verrouillage automatique", "Quand l'appli passe en arrière-plan : ${settings.vaultLockDelay.label.lowercase()}", first = true) {
+                    lockDialog = true
+                }
+                SwitchItem(Icons.Outlined.Screenshot, "Captures d'écran", "Autoriser captures et enregistrement d'écran", settings.vaultScreenshots) {
                     scope.launch { repo.setVaultScreenshots(it) }
                 }
             }
@@ -178,6 +202,26 @@ fun SettingsScreen(onBack: () -> Unit) {
     }
 
     if (qrDialog) QrCodeDialog(onDismiss = { qrDialog = false })
+    if (lockDialog) {
+        ChoiceDialog(
+            title = "Verrouiller le coffre",
+            text = "Quand vous quittez l'appli (écran d'accueil, autre appli, écran éteint).",
+            options = VaultLockDelay.entries,
+            label = { it.label },
+            selected = settings.vaultLockDelay,
+            onDismiss = { lockDialog = false },
+        ) { scope.launch { repo.setVaultLockDelay(it) } }
+    }
+    if (trashDialog) {
+        ChoiceDialog(
+            title = "Vider automatiquement",
+            text = "Durée de conservation dans la corbeille avant suppression définitive.",
+            options = TrashRetention.entries,
+            label = { it.label },
+            selected = settings.trashRetention,
+            onDismiss = { trashDialog = false },
+        ) { scope.launch { repo.setTrashRetention(it) } }
+    }
     if (themeDialog) {
         AlertDialog(
             onDismissRequest = { themeDialog = false },
@@ -195,6 +239,35 @@ fun SettingsScreen(onBack: () -> Unit) {
             confirmButton = { TextButton(onClick = { themeDialog = false }) { Text("Fermer") } },
         )
     }
+}
+
+@Composable
+private fun <T> ChoiceDialog(
+    title: String,
+    text: String,
+    options: List<T>,
+    label: (T) -> String,
+    selected: T,
+    onDismiss: () -> Unit,
+    onSelect: (T) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                options.forEach { option ->
+                    RadioRow(label(option), option == selected) {
+                        onDismiss()
+                        onSelect(option)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Fermer") } },
+    )
 }
 
 /** Carte de réglages : titre en petites capitales ; les éléments (sauf le premier) ont un trait fin au-dessus. */

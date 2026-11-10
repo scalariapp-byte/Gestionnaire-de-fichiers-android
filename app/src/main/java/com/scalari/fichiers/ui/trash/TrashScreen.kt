@@ -2,6 +2,7 @@
 
 package com.scalari.fichiers.ui.trash
 
+import com.scalari.fichiers.FileManagerApp
 import android.app.Application
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -69,7 +70,11 @@ class TrashViewModel(app: Application) : AndroidViewModel(app) {
 
     fun load() {
         viewModelScope.launch {
-            _entries.value = withContext(Dispatchers.IO) { TrashManager.list(getApplication<Application>()) }
+            _entries.value = withContext(Dispatchers.IO) {
+                val app = getApplication<Application>()
+                TrashManager.purgeExpired(app, FileManagerApp.instance.settingsState.value.trashRetention.days)
+                TrashManager.list(app)
+            }
         }
     }
 }
@@ -81,6 +86,7 @@ fun TrashScreen(onBack: () -> Unit) {
     val snackbar = LocalSnackbarHostState.current
     var selected by remember { mutableStateOf<TrashEntry?>(null) }
     var confirmEmpty by remember { mutableStateOf(false) }
+    val retentionDays = FileManagerApp.instance.settingsState.collectAsStateWithLifecycle().value.trashRetention.days
 
     Scaffold(
         topBar = {
@@ -128,6 +134,15 @@ fun TrashScreen(onBack: () -> Unit) {
                 }
 
                 else -> LazyColumn(Modifier.fillMaxSize()) {
+                    item(key = "retention") {
+                        Text(
+                            if (retentionDays > 0) "Les éléments sont supprimés définitivement après $retentionDays jours (modifiable dans les paramètres)."
+                            else "Suppression automatique désactivée : videz la corbeille vous-même.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        )
+                    }
                     items(list, key = { it.file.absolutePath }) { entry ->
                         val type = FileTypes.of(entry.displayName, entry.isDirectory)
                         ListItem(
@@ -136,7 +151,9 @@ fun TrashScreen(onBack: () -> Unit) {
                             headlineContent = { Text(entry.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             supportingContent = {
                                 Text(
-                                    "${formatSize(entry.size)} · supprimé le ${formatDate(entry.deletedAt)}\n${entry.originalPath}",
+                                    "${formatSize(entry.size)} · supprimé le ${formatDate(entry.deletedAt)}" +
+                                        (TrashManager.daysLeft(entry, retentionDays)?.let { " · encore $it j" } ?: "") +
+                                        "\n${entry.originalPath}",
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )

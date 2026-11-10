@@ -84,6 +84,24 @@ object TrashManager {
         return target
     }
 
+    /** Supprime définitivement ce qui est dans la corbeille depuis plus de [days] jours (0 = jamais). */
+    fun purgeExpired(context: Context, days: Int, now: Long = System.currentTimeMillis()): Int {
+        if (days <= 0) return 0
+        val limit = now - days * 86_400_000L
+        var count = 0
+        for (entry in list(context)) {
+            if (entry.deletedAt < limit && runCatching { deletePermanently(entry) }.isSuccess) count++
+        }
+        return count
+    }
+
+    /** Jours restants avant la suppression automatique (null si désactivée). */
+    fun daysLeft(entry: TrashEntry, days: Int, now: Long = System.currentTimeMillis()): Int? {
+        if (days <= 0) return null
+        val left = entry.deletedAt + days * 86_400_000L - now
+        return ((left + 86_399_999L) / 86_400_000L).toInt().coerceAtLeast(0)
+    }
+
     fun deletePermanently(entry: TrashEntry) {
         if (!entry.file.deleteRecursively()) throw IOException("Impossible de supprimer ${entry.displayName}")
         infoFile(entry.file).delete()

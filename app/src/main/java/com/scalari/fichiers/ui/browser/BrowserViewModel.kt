@@ -77,7 +77,7 @@ class BrowserViewModel(app: Application, startPath: String?, openSearch: Boolean
         load()
         refreshVolumes()
         viewModelScope.launch {
-            settings.map { listOf(it.showHidden, it.sortBy, it.ascending, it.foldersFirst) }
+            settings.map { listOf(it.showHidden, it.sortBy, it.ascending, it.foldersFirst, it.folderViews) }
                 .distinctUntilChanged()
                 .drop(1)
                 .collect { load() }
@@ -89,7 +89,7 @@ class BrowserViewModel(app: Application, startPath: String?, openSearch: Boolean
         loadJob?.cancel()
         if (userRefresh) _state.update { it.copy(refreshing = true) }
         loadJob = viewModelScope.launch {
-            val s = settings.value
+            val s = settings.value.forFolder(dir.absolutePath)
             // Le tri par taille a besoin du nombre d'éléments des dossiers dès le départ.
             val needCounts = s.sortBy == com.scalari.fichiers.data.SortBy.SIZE
             val items = withContext(Dispatchers.IO) { FileOps.list(dir, s, countChildren = needCounts) }

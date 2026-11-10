@@ -161,7 +161,10 @@ private sealed interface BrowserDialog {
 fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigator, isTab: Boolean = false) {
     val vm: BrowserViewModel = viewModel { BrowserViewModel(FileManagerApp.instance, startPath, openSearch) }
     val state by vm.state.collectAsStateWithLifecycle()
-    val settings by FileManagerApp.instance.settingsState.collectAsStateWithLifecycle()
+    val globalSettings by FileManagerApp.instance.settingsState.collectAsStateWithLifecycle()
+    // Tri et affichage propres au dossier courant s'il en a, sinon les réglages généraux.
+    val folderView = globalSettings.folderViews[state.currentDir.absolutePath]
+    val settings = globalSettings.forFolder(state.currentDir.absolutePath)
     val clip by FileClipboard.clip.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarHostState.current
     val context = LocalContext.current
@@ -261,7 +264,13 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
                     },
                     actions = {
                         IconButton(onClick = { vm.setSearchActive(true) }) { Icon(Icons.Filled.Search, "Rechercher") }
-                        IconButton(onClick = { scope.launch { repo.setGridView(!settings.gridView) } }) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                val path = state.currentDir.absolutePath
+                                if (folderView != null) repo.setFolderView(path, folderView.copy(grid = !folderView.grid))
+                                else repo.setGridView(!settings.gridView)
+                            }
+                        }) {
                             Icon(if (settings.gridView) Icons.Filled.ViewList else Icons.Filled.GridView, "Changer d'affichage")
                         }
                         var menu by remember { mutableStateOf(false) }
@@ -444,11 +453,20 @@ fun BrowserScreen(startPath: String?, openSearch: Boolean, navigator: AppNavigat
 
         BrowserDialog.Sort -> SortDialog(
             sortBy = settings.sortBy, ascending = settings.ascending, foldersFirst = settings.foldersFirst,
+            folderName = state.currentDir.name.ifEmpty { "/" },
+            folderOnly = folderView != null,
             onDismiss = { dialog = null },
-            onApply = { by, asc, folders ->
+            onApply = { by, asc, folders, onlyHere ->
                 dialog = null
                 scope.launch {
-                    repo.setSort(by, asc)
+                    val path = state.currentDir.absolutePath
+                    if (onlyHere) {
+                        repo.setFolderView(path, com.scalari.fichiers.data.FolderView(by, asc, settings.gridView))
+                    } else {
+                        // Réglage général : ce dossier suit de nouveau les réglages communs.
+                        repo.setFolderView(path, null)
+                        repo.setSort(by, asc)
+                    }
                     repo.setFoldersFirst(folders)
                 }
             },

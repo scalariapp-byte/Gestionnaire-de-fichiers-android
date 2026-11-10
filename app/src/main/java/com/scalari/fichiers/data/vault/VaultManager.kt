@@ -168,6 +168,47 @@ object VaultManager {
         writeMeta(newPin, dek)
     }
 
+    // ------------------------------------------------------------------ Verrouillage auto
+
+    private val mainHandler by lazy { android.os.Handler(android.os.Looper.getMainLooper()) }
+    private var pendingLock: Runnable? = null
+    private var backgroundAt = 0L
+
+    /** L'appli passe en arrière-plan : verrouille tout de suite ou après [delaySeconds]. */
+    fun onAppBackground(context: Context, delaySeconds: Int) {
+        val app = context.applicationContext
+        cancelPendingLock()
+        if (delaySeconds <= 0) {
+            lock(app)
+            return
+        }
+        if (key == null) return
+        backgroundAt = android.os.SystemClock.elapsedRealtime()
+        val r = Runnable {
+            pendingLock = null
+            backgroundAt = 0L
+            lock(app)
+        }
+        pendingLock = r
+        mainHandler.postDelayed(r, delaySeconds * 1000L)
+    }
+
+    /** Retour au premier plan : annule le verrouillage prévu, sauf si le délai est déjà écoulé. */
+    fun onAppForeground(context: Context, delaySeconds: Int) {
+        val since = backgroundAt
+        cancelPendingLock()
+        // Le minuteur du Handler s'arrête pendant la veille profonde : on vérifie avec l'horloge réelle.
+        if (since > 0 && android.os.SystemClock.elapsedRealtime() - since >= delaySeconds * 1000L) {
+            lock(context.applicationContext)
+        }
+    }
+
+    private fun cancelPendingLock() {
+        pendingLock?.let(mainHandler::removeCallbacks)
+        pendingLock = null
+        backgroundAt = 0L
+    }
+
     fun lock(context: Context) {
         if (key != null || tempDir(context).exists()) {
             // Arrête une lecture en cours d'un fichier du coffre (sa copie déchiffrée va être effacée).
